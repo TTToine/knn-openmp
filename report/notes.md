@@ -96,3 +96,42 @@ Formato suggerito (una voce per esperimento):
   indipendenti (unrolling della riduzione) attaccherebbero il limite di latenza in L2.
 
 ---
+
+## 2026-11-15 — Con vs senza auto-vettorizzazione (`build-novec`)
+- **Ipotesi:** `-fno-tree-vectorize` (a) non tocca omp_simd, perché `#pragma omp simd`
+  forza la vettorizzazione del loop; (b) cambia poco omp_naive: con auto-vec GCC
+  vettorizza solo `sub`/`mul` ma somma in ordine (fold-left), senza ha una FMA scalare
+  per elemento. In entrambi i casi il collo di bottiglia è una operazione dipendente per
+  elemento (~4 cicli di latenza) → stesso throughput.
+- **Configurazione:** commit `3dcb380`, 1 thread (la vettorizzazione agisce dentro un
+  core), `OMP_SCHEDULE=static`, k=5, euclidea, 3 run + 1 warm-up. Training 64 righe
+  (in L2) × 10000 test e 60000 righe (DRAM) × 100 test.
+- **Comando:** `cmake -S . -B build-novec -DKNN_NO_VEC=ON && cmake --build build-novec -j && bash scripts/novec.sh`
+- **File risultati:** `results/raw/novec_20261115_181101.csv`
+- **Assembly** (istruzioni float nel corpo parallelo, `objdump`):
+  - omp_naive `build`: `vsubps`, `vmulps` + catena di `vaddss` (fold-left reduction)
+  - omp_naive `build-novec`: solo scalare, `vsubss` + `vfmadd231ss` (`s += t*t` fusa)
+  - omp_simd: identica nelle due build (`vfmadd231ps`) → conferma (a)
+- **Risultato** (mediana, 1 thread):
+
+  | training     | variante  | vec      | novec    | vec/novec |
+  |--------------|-----------|----------|----------|-----------|
+  | 64 (L2)      | omp_naive | 0.520 s  | 0.529 s  | 1.02×     |
+  | 64 (L2)      | omp_simd  | 0.072 s  | 0.073 s  | 1.01×     |
+  | 60000 (DRAM) | omp_naive | 5.546 s  | 5.761 s  | 1.04×     |
+  | 60000 (DRAM) | omp_simd  | 1.972 s  | 1.990 s  | 1.01×     |
+
+  0 mismatch ovunque. NB: la cache del riferimento (`.cache/`) non distingue la build,
+  quindi anche la novec è stata validata contro il riferimento della build normale:
+  nonostante FMA scalare vs `vmulps`+`vaddss` (arrotondamenti diversi) le predizioni
+  coincidono.
+- **Interpretazione:** entrambe le ipotesi confermate. L'auto-vettorizzazione di GCC
+  dà solo 2-4% su omp_naive: vettorizza la parte "facile" (sub/mul) ma non può
+  riassociare la riduzione senza `-ffast-math`, quindi resta latency-bound. Il guadagno
+  di omp_simd (7.2× in L2) viene tutto dal permesso esplicito di riordinare le somme,
+  non dalla vettorizzazione automatica. Messaggio per il report: "vettorizzato" nel
+  report di GCC ≠ veloce; bisogna guardare *come* è fatta la riduzione.
+- **Prossimo passo:** variante blocking (roadmap 4); in alternativa più accumulatori
+  per superare il limite di latenza dell'FMA in L2.
+
+---

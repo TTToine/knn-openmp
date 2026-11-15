@@ -70,7 +70,7 @@ python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici
 ## Roadmap varianti (dalle slide della traccia)
 1. [x] `omp_naive` — `parallel for` sui campioni di test, `schedule(runtime)`.
    Esperimenti: strong scaling 1-12 thread, confronto scheduling/chunk.
-2. [ ] `omp_simd` — `#pragma omp simd reduction(+:s)` sul loop delle distanze;
+2. [x] `omp_simd` — `#pragma omp simd reduction(+:s)` sul loop delle distanze;
    confronto con/senza vettorizzazione (`build-novec`), report di vettorizzazione.
 3. [ ] Layout dati AoS vs SoA — training set trasposto (feature-major): si vettorizza
    *su più campioni di training* invece che sulle dimensioni, senza riduzione
