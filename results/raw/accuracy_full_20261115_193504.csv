@@ -1,0 +1,7 @@
+tag,variant,threads,schedule,k,metric,source,n_train,n_test,dim,replicate,run,time_s,accuracy,mismatches,cpu_s
+full,omp_blocked4,12,static,1,euclidean,mnist,60000,10000,784,1,0,9.61871,0.9691,-1,109.938
+full,omp_blocked4,12,static,5,euclidean,mnist,60000,10000,784,1,0,12.9666,0.9693,-1,137.537
+full,omp_blocked4,12,static,10,euclidean,mnist,60000,10000,784,1,0,15.4858,0.9683,-1,160.538
+full,omp_blocked4,12,static,1,cosine,mnist,60000,10000,784,1,0,9.29589,0.9723,-1,107.041
+full,omp_blocked4,12,static,5,cosine,mnist,60000,10000,784,1,0,8.83987,0.9737,-1,99.9708
+full,omp_blocked4,12,static,10,cosine,mnist,60000,10000,784,1,0,9.01189,0.9724,-1,101.72

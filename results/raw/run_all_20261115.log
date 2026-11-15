@@ -1,0 +1,438 @@
+### commit c33260f 
+[18:47:52] build/seq          t=1   sched=static      
+    seq          threads=1   median=19.0808s mean=19.3903s std=0.8202s min=18.9227s max=20.8490s cpu=19.0796s acc=0.9688 mismatches=0
+[18:49:51] build/omp_naive    t=1   sched=static      
+    omp_naive    threads=1   median=19.0256s mean=19.0129s std=0.0687s min=18.9317s max=19.0888s cpu=19.0234s acc=0.9688 mismatches=0
+[18:51:45] build/omp_simd     t=1   sched=static      
+    omp_simd     threads=1   median=6.6155s mean=6.2206s std=0.6819s min=5.2422s max=6.7723s cpu=6.6141s acc=0.9688 mismatches=0
+[18:52:23] build/omp_soa      t=1   sched=static      
+    omp_soa      threads=1   median=5.6137s mean=5.6026s std=0.0461s min=5.5276s max=5.6531s cpu=5.6131s acc=0.9688 mismatches=0
+[18:52:57] build/omp_aosoa    t=1   sched=static      
+    omp_aosoa    threads=1   median=4.8872s mean=4.9131s std=0.0612s min=4.8500s max=4.9960s cpu=4.8867s acc=0.9688 mismatches=0
+[18:53:26] build/omp_blocked  t=1   sched=static      
+    omp_blocked  threads=1   median=2.0457s mean=2.0428s std=0.0099s min=2.0308s max=2.0530s cpu=2.0430s acc=0.9688 mismatches=0
+[18:53:39] build/omp_blocked4 t=1   sched=static      
+    omp_blocked4 threads=1   median=0.8919s mean=0.8907s std=0.0040s min=0.8861s max=0.8955s cpu=0.8900s acc=0.9688 mismatches=0
+[18:53:44] build/omp_simd     t=2   sched=static      
+    omp_simd     threads=2   median=2.6546s mean=2.6660s std=0.0538s min=2.6234s max=2.7592s cpu=5.3100s acc=0.9688 mismatches=0
+[18:54:01] build/omp_soa      t=2   sched=static      
+    omp_soa      threads=2   median=3.0539s mean=3.0336s std=0.0789s min=2.9297s max=3.1384s cpu=6.0872s acc=0.9688 mismatches=0
+[18:54:19] build/omp_aosoa    t=2   sched=static      
+    omp_aosoa    threads=2   median=2.6874s mean=2.7599s std=0.1627s min=2.6651s max=3.0486s cpu=5.3673s acc=0.9688 mismatches=0
+[18:54:36] build/omp_blocked  t=2   sched=static      
+    omp_blocked  threads=2   median=1.0775s mean=1.0753s std=0.0114s min=1.0604s max=1.0873s cpu=2.1574s acc=0.9688 mismatches=0
+[18:54:42] build/omp_blocked4 t=2   sched=static      
+    omp_blocked4 threads=2   median=0.4583s mean=0.4727s std=0.0330s min=0.4480s max=0.5296s cpu=0.9141s acc=0.9688 mismatches=0
+[18:54:45] build/omp_naive    t=2   sched=static      
+    omp_naive    threads=2   median=8.7156s mean=8.7248s std=0.0498s min=8.6676s max=8.8039s cpu=17.4207s acc=0.9688 mismatches=0
+[18:55:38] build/omp_soa      t=4   sched=static      
+    omp_soa      threads=4   median=2.7082s mean=2.7652s std=0.2080s min=2.5919s max=3.0899s cpu=10.6870s acc=0.9688 mismatches=0
+[18:55:55] build/omp_aosoa    t=4   sched=static      
+    omp_aosoa    threads=4   median=1.4044s mean=1.4185s std=0.0453s min=1.3815s max=1.4973s cpu=5.5828s acc=0.9688 mismatches=0
+[18:56:04] build/omp_blocked  t=4   sched=static      
+    omp_blocked  threads=4   median=0.6106s mean=0.6078s std=0.0213s min=0.5719s max=0.6267s cpu=2.3952s acc=0.9688 mismatches=0
+[18:56:08] build/omp_blocked4 t=4   sched=static      
+    omp_blocked4 threads=4   median=0.2701s mean=0.2868s std=0.0373s min=0.2593s max=0.3514s cpu=1.0446s acc=0.9688 mismatches=0
+[18:56:09] build/omp_naive    t=4   sched=static      
+    omp_naive    threads=4   median=4.5342s mean=4.5595s std=0.1028s min=4.4635s max=4.7351s cpu=18.0158s acc=0.9688 mismatches=0
+[18:56:37] build/omp_simd     t=4   sched=static      
+    omp_simd     threads=4   median=1.3581s mean=1.3928s std=0.0779s min=1.3477s max=1.5306s cpu=5.4380s acc=0.9688 mismatches=0
+[18:56:46] build/omp_aosoa    t=6   sched=static      
+    omp_aosoa    threads=6   median=0.9541s mean=0.9705s std=0.0406s min=0.9488s max=1.0428s cpu=5.6751s acc=0.9688 mismatches=0
+[18:56:52] build/omp_blocked  t=6   sched=static      
+    omp_blocked  threads=6   median=0.4489s mean=0.4539s std=0.0174s min=0.4377s max=0.4826s cpu=2.6095s acc=0.9688 mismatches=0
+[18:56:55] build/omp_blocked4 t=6   sched=static      
+    omp_blocked4 threads=6   median=0.2753s mean=0.2704s std=0.0238s min=0.2309s max=0.2903s cpu=1.5199s acc=0.9688 mismatches=0
+[18:56:56] build/omp_naive    t=6   sched=static      
+    omp_naive    threads=6   median=3.1002s mean=3.0820s std=0.0317s min=3.0396s max=3.1071s cpu=18.2812s acc=0.9688 mismatches=0
+[18:57:15] build/omp_simd     t=6   sched=static      
+    omp_simd     threads=6   median=0.9142s mean=0.9422s std=0.0737s min=0.9023s max=1.0734s cpu=5.4869s acc=0.9688 mismatches=0
+[18:57:21] build/omp_soa      t=6   sched=static      
+    omp_soa      threads=6   median=1.7980s mean=1.8356s std=0.0674s min=1.7876s max=1.9493s cpu=10.5514s acc=0.9688 mismatches=0
+[18:57:32] build/omp_blocked  t=8   sched=static      
+    omp_blocked  threads=8   median=0.3578s mean=0.3550s std=0.0064s min=0.3478s max=0.3626s cpu=2.7713s acc=0.9688 mismatches=0
+[18:57:34] build/omp_blocked4 t=8   sched=static      
+    omp_blocked4 threads=8   median=0.2361s mean=0.2351s std=0.0103s min=0.2206s max=0.2491s cpu=1.7945s acc=0.9688 mismatches=0
+[18:57:36] build/omp_naive    t=8   sched=static      
+    omp_naive    threads=8   median=2.2874s mean=2.2884s std=0.0330s min=2.2554s max=2.3389s cpu=17.9120s acc=0.9688 mismatches=0
+[18:57:50] build/omp_simd     t=8   sched=static      
+    omp_simd     threads=8   median=0.7255s mean=0.7323s std=0.0201s min=0.7098s max=0.7609s cpu=5.7214s acc=0.9688 mismatches=0
+[18:57:54] build/omp_soa      t=8   sched=static      
+    omp_soa      threads=8   median=1.4246s mean=1.4278s std=0.0143s min=1.4098s max=1.4475s cpu=11.1541s acc=0.9688 mismatches=0
+[18:58:03] build/omp_aosoa    t=8   sched=static      
+    omp_aosoa    threads=8   median=0.7540s mean=0.7915s std=0.1127s min=0.7161s max=0.9907s cpu=5.9224s acc=0.9688 mismatches=0
+[18:58:08] build/omp_blocked4 t=12  sched=static      
+    omp_blocked4 threads=12  median=0.1712s mean=0.1715s std=0.0035s min=0.1679s max=0.1755s cpu=1.9737s acc=0.9688 mismatches=0
+[18:58:09] build/omp_naive    t=12  sched=static      
+    omp_naive    threads=12  median=2.7422s mean=2.7686s std=0.1083s min=2.6253s max=2.9030s cpu=31.6636s acc=0.9688 mismatches=0
+[18:58:26] build/omp_simd     t=12  sched=static      
+    omp_simd     threads=12  median=2.8829s mean=2.9920s std=0.2822s min=2.6618s max=3.2996s cpu=33.6965s acc=0.9688 mismatches=0
+[18:58:44] build/omp_soa      t=12  sched=static      
+    omp_soa      threads=12  median=2.9037s mean=2.8759s std=0.1982s min=2.5913s max=3.0776s cpu=33.0845s acc=0.9688 mismatches=0
+[18:59:02] build/omp_aosoa    t=12  sched=static      
+    omp_aosoa    threads=12  median=3.2636s mean=3.1502s std=0.2452s min=2.7327s max=3.3152s cpu=37.9604s acc=0.9688 mismatches=0
+[18:59:21] build/omp_blocked  t=12  sched=static      
+    omp_blocked  threads=12  median=0.2724s mean=0.2728s std=0.0022s min=0.2696s max=0.2753s cpu=3.1625s acc=0.9688 mismatches=0
+
+results: results/raw/threads_20261115_184752.csv
+[18:59:23] build/omp_naive    t=12  sched=static      
+    omp_naive    threads=12  median=2.6592s mean=2.7899s std=0.3696s min=2.4792s max=3.4287s cpu=30.4526s acc=0.9688 mismatches=0
+[18:59:41] build/omp_simd     t=12  sched=static      
+    omp_simd     threads=12  median=2.7539s mean=2.8941s std=0.2929s min=2.6341s max=3.3234s cpu=32.3069s acc=0.9688 mismatches=0
+[18:59:59] build/omp_blocked  t=12  sched=static      
+    omp_blocked  threads=12  median=0.2794s mean=0.2786s std=0.0027s min=0.2757s max=0.2814s cpu=3.2028s acc=0.9688 mismatches=0
+[19:00:01] build/omp_blocked4 t=12  sched=static      
+    omp_blocked4 threads=12  median=0.1702s mean=0.1713s std=0.0107s min=0.1612s max=0.1883s cpu=1.9089s acc=0.9688 mismatches=0
+[19:00:02] build/omp_simd     t=12  sched=static,1    
+    omp_simd     threads=12  median=2.8318s mean=2.9781s std=0.2435s min=2.7802s max=3.2812s cpu=32.8152s acc=0.9688 mismatches=0
+[19:00:20] build/omp_blocked  t=12  sched=static,1    
+    omp_blocked  threads=12  median=0.2767s mean=0.2779s std=0.0045s min=0.2739s max=0.2856s cpu=3.1987s acc=0.9688 mismatches=0
+[19:00:22] build/omp_blocked4 t=12  sched=static,1    
+    omp_blocked4 threads=12  median=0.1710s mean=0.1711s std=0.0057s min=0.1640s max=0.1773s cpu=1.9721s acc=0.9688 mismatches=0
+[19:00:24] build/omp_naive    t=12  sched=static,1    
+    omp_naive    threads=12  median=2.8241s mean=2.7891s std=0.0798s min=2.6719s max=2.8549s cpu=32.6533s acc=0.9688 mismatches=0
+[19:00:40] build/omp_blocked  t=12  sched=static,16   
+    omp_blocked  threads=12  median=1.4045s mean=1.4271s std=0.0640s min=1.3873s max=1.5407s cpu=2.1437s acc=0.9688 mismatches=0
+[19:00:49] build/omp_blocked4 t=12  sched=static,16   
+    omp_blocked4 threads=12  median=0.6087s mean=0.6308s std=0.0513s min=0.5892s max=0.7178s cpu=0.9398s acc=0.9688 mismatches=0
+[19:00:53] build/omp_naive    t=12  sched=static,16   
+    omp_naive    threads=12  median=2.9252s mean=2.7626s std=0.2567s min=2.4780s max=2.9919s cpu=33.5981s acc=0.9688 mismatches=0
+[19:01:10] build/omp_simd     t=12  sched=static,16   
+    omp_simd     threads=12  median=2.7749s mean=2.7384s std=0.2541s min=2.3570s max=2.9926s cpu=32.2108s acc=0.9688 mismatches=0
+[19:01:26] build/omp_blocked4 t=12  sched=dynamic,1   
+    omp_blocked4 threads=12  median=0.1721s mean=0.1721s std=0.0059s min=0.1660s max=0.1805s cpu=1.9942s acc=0.9688 mismatches=0
+[19:01:28] build/omp_naive    t=12  sched=dynamic,1   
+    omp_naive    threads=12  median=2.7011s mean=2.6483s std=0.1412s min=2.4632s max=2.8118s cpu=32.0450s acc=0.9688 mismatches=0
+[19:01:44] build/omp_simd     t=12  sched=dynamic,1   
+    omp_simd     threads=12  median=3.0853s mean=3.0443s std=0.2359s min=2.6682s max=3.3046s cpu=36.5985s acc=0.9688 mismatches=0
+[19:02:02] build/omp_blocked  t=12  sched=dynamic,1   
+    omp_blocked  threads=12  median=0.2795s mean=0.2804s std=0.0072s min=0.2731s max=0.2916s cpu=3.2087s acc=0.9688 mismatches=0
+[19:02:04] build/omp_naive    t=12  sched=dynamic,16  
+    omp_naive    threads=12  median=2.8982s mean=2.8025s std=0.1795s min=2.5574s max=2.9615s cpu=33.1746s acc=0.9688 mismatches=0
+[19:02:21] build/omp_simd     t=12  sched=dynamic,16  
+    omp_simd     threads=12  median=2.9211s mean=2.8881s std=0.1304s min=2.6806s max=3.0369s cpu=33.9188s acc=0.9688 mismatches=0
+[19:02:39] build/omp_blocked  t=12  sched=dynamic,16  
+    omp_blocked  threads=12  median=1.3929s mean=1.3936s std=0.0096s min=1.3828s max=1.4082s cpu=2.1181s acc=0.9688 mismatches=0
+[19:02:48] build/omp_blocked4 t=12  sched=dynamic,16  
+    omp_blocked4 threads=12  median=0.6196s mean=0.6149s std=0.0188s min=0.5930s max=0.6399s cpu=0.9496s acc=0.9688 mismatches=0
+[19:02:51] build/omp_simd     t=12  sched=dynamic,64  
+    omp_simd     threads=12  median=0.9034s mean=0.9312s std=0.0640s min=0.8953s max=1.0452s cpu=5.4388s acc=0.9688 mismatches=0
+[19:02:57] build/omp_blocked  t=12  sched=dynamic,64  
+    omp_blocked  threads=12  median=2.0546s mean=2.0506s std=0.0092s min=2.0369s max=2.0601s cpu=2.0714s acc=0.9688 mismatches=0
+[19:03:10] build/omp_blocked4 t=12  sched=dynamic,64  
+    omp_blocked4 threads=12  median=0.8696s mean=0.8707s std=0.0131s min=0.8571s max=0.8852s cpu=0.8989s acc=0.9688 mismatches=0
+[19:03:15] build/omp_naive    t=12  sched=dynamic,64  
+    omp_naive    threads=12  median=3.0351s mean=3.0565s std=0.0534s min=2.9990s max=3.1366s cpu=18.0220s acc=0.9688 mismatches=0
+[19:03:34] build/omp_blocked  t=12  sched=guided      
+    omp_blocked  threads=12  median=0.2699s mean=0.2725s std=0.0061s min=0.2662s max=0.2819s cpu=3.1244s acc=0.9688 mismatches=0
+[19:03:36] build/omp_blocked4 t=12  sched=guided      
+    omp_blocked4 threads=12  median=0.1640s mean=0.1644s std=0.0043s min=0.1593s max=0.1713s cpu=1.8619s acc=0.9688 mismatches=0
+[19:03:37] build/omp_naive    t=12  sched=guided      
+    omp_naive    threads=12  median=2.6226s mean=2.7431s std=0.2503s min=2.4935s max=3.1137s cpu=31.0764s acc=0.9688 mismatches=0
+[19:03:53] build/omp_simd     t=12  sched=guided      
+    omp_simd     threads=12  median=2.8505s mean=2.8236s std=0.2292s min=2.4529s max=3.0435s cpu=33.6411s acc=0.9688 mismatches=0
+
+results: results/raw/schedule_20261115_185923.csv
+[19:04:10] build/omp_blocked  t=6   sched=static      KNN_TB=8 KNN_QB=4
+    omp_blocked  threads=6   median=0.5712s mean=0.5696s std=0.0131s min=0.5503s max=0.5871s cpu=3.2956s acc=0.9688 mismatches=0
+[19:04:14] build/omp_blocked4 t=6   sched=static      KNN_TB=8 KNN_QB=4
+    omp_blocked4 threads=6   median=0.4353s mean=0.4392s std=0.0175s min=0.4182s max=0.4646s cpu=2.4536s acc=0.9688 mismatches=0
+[19:04:17] build/omp_blocked  t=6   sched=static      KNN_TB=16 KNN_QB=4
+    omp_blocked  threads=6   median=0.6739s mean=0.6702s std=0.0176s min=0.6421s max=0.6909s cpu=3.9553s acc=0.9688 mismatches=0
+[19:04:21] build/omp_blocked4 t=6   sched=static      KNN_TB=16 KNN_QB=4
+    omp_blocked4 threads=6   median=0.4543s mean=0.4749s std=0.0441s min=0.4489s max=0.5525s cpu=2.6218s acc=0.9688 mismatches=0
+[19:04:24] build/omp_blocked  t=6   sched=static      KNN_TB=32 KNN_QB=4
+    omp_blocked  threads=6   median=0.6937s mean=0.7192s std=0.0926s min=0.6534s max=0.8813s cpu=3.9152s acc=0.9688 mismatches=0
+[19:04:29] build/omp_blocked4 t=6   sched=static      KNN_TB=32 KNN_QB=4
+    omp_blocked4 threads=6   median=0.4329s mean=0.4305s std=0.0215s min=0.3990s max=0.4513s cpu=2.4785s acc=0.9688 mismatches=0
+[19:04:31] build/omp_blocked  t=6   sched=static      KNN_TB=64 KNN_QB=4
+    omp_blocked  threads=6   median=0.7907s mean=0.8068s std=0.0394s min=0.7861s max=0.8771s cpu=4.6169s acc=0.9688 mismatches=0
+[19:04:37] build/omp_blocked4 t=6   sched=static      KNN_TB=64 KNN_QB=4
+    omp_blocked4 threads=6   median=0.4192s mean=0.4283s std=0.0255s min=0.4051s max=0.4662s cpu=2.3917s acc=0.9688 mismatches=0
+[19:04:39] build/omp_blocked  t=6   sched=static      KNN_TB=128 KNN_QB=4
+    omp_blocked  threads=6   median=0.8056s mean=0.8027s std=0.0655s min=0.6946s max=0.8625s cpu=4.7364s acc=0.9688 mismatches=0
+[19:04:44] build/omp_blocked4 t=6   sched=static      KNN_TB=128 KNN_QB=4
+    omp_blocked4 threads=6   median=0.3829s mean=0.3824s std=0.0160s min=0.3651s max=0.4055s cpu=2.2457s acc=0.9688 mismatches=0
+[19:04:47] build/omp_blocked  t=6   sched=static      KNN_TB=256 KNN_QB=4
+    omp_blocked  threads=6   median=0.6820s mean=0.6815s std=0.0314s min=0.6323s max=0.7100s cpu=3.8594s acc=0.9688 mismatches=0
+[19:04:51] build/omp_blocked4 t=6   sched=static      KNN_TB=256 KNN_QB=4
+    omp_blocked4 threads=6   median=0.3838s mean=0.3807s std=0.0154s min=0.3577s max=0.3949s cpu=2.2317s acc=0.9688 mismatches=0
+[19:04:54] build/omp_blocked  t=6   sched=static      KNN_TB=8 KNN_QB=8
+    omp_blocked  threads=6   median=0.5138s mean=0.5124s std=0.0128s min=0.4979s max=0.5279s cpu=2.9696s acc=0.9688 mismatches=0
+[19:04:57] build/omp_blocked4 t=6   sched=static      KNN_TB=8 KNN_QB=8
+    omp_blocked4 threads=6   median=0.3283s mean=0.3317s std=0.0120s min=0.3173s max=0.3452s cpu=1.8776s acc=0.9688 mismatches=0
+[19:04:59] build/omp_blocked  t=6   sched=static      KNN_TB=16 KNN_QB=8
+    omp_blocked  threads=6   median=0.5335s mean=0.5357s std=0.0200s min=0.5066s max=0.5614s cpu=3.1112s acc=0.9688 mismatches=0
+[19:05:03] build/omp_blocked4 t=6   sched=static      KNN_TB=16 KNN_QB=8
+    omp_blocked4 threads=6   median=0.3467s mean=0.3351s std=0.0273s min=0.3060s max=0.3681s cpu=1.9398s acc=0.9688 mismatches=0
+[19:05:05] build/omp_blocked  t=6   sched=static      KNN_TB=32 KNN_QB=8
+    omp_blocked  threads=6   median=0.5263s mean=0.5304s std=0.0208s min=0.5025s max=0.5587s cpu=3.0700s acc=0.9688 mismatches=0
+[19:05:08] build/omp_blocked4 t=6   sched=static      KNN_TB=32 KNN_QB=8
+    omp_blocked4 threads=6   median=0.3621s mean=0.3514s std=0.0269s min=0.3036s max=0.3669s cpu=2.0182s acc=0.9688 mismatches=0
+[19:05:11] build/omp_blocked  t=6   sched=static      KNN_TB=64 KNN_QB=8
+    omp_blocked  threads=6   median=0.5879s mean=0.5803s std=0.0176s min=0.5559s max=0.5986s cpu=3.3164s acc=0.9688 mismatches=0
+[19:05:14] build/omp_blocked4 t=6   sched=static      KNN_TB=64 KNN_QB=8
+    omp_blocked4 threads=6   median=0.3747s mean=0.3692s std=0.0164s min=0.3418s max=0.3854s cpu=2.1183s acc=0.9688 mismatches=0
+[19:05:17] build/omp_blocked  t=6   sched=static      KNN_TB=128 KNN_QB=8
+    omp_blocked  threads=6   median=0.6371s mean=0.6332s std=0.0455s min=0.5575s max=0.6754s cpu=3.6710s acc=0.9688 mismatches=0
+[19:05:21] build/omp_blocked4 t=6   sched=static      KNN_TB=128 KNN_QB=8
+    omp_blocked4 threads=6   median=0.3611s mean=0.3587s std=0.0199s min=0.3348s max=0.3789s cpu=1.9942s acc=0.9688 mismatches=0
+[19:05:23] build/omp_blocked  t=6   sched=static      KNN_TB=256 KNN_QB=8
+    omp_blocked  threads=6   median=0.6871s mean=0.6897s std=0.0205s min=0.6616s max=0.7132s cpu=3.8353s acc=0.9688 mismatches=0
+[19:05:27] build/omp_blocked4 t=6   sched=static      KNN_TB=256 KNN_QB=8
+    omp_blocked4 threads=6   median=0.4266s mean=0.4365s std=0.0297s min=0.4043s max=0.4839s cpu=2.4384s acc=0.9688 mismatches=0
+[19:05:30] build/omp_blocked  t=6   sched=static      KNN_TB=8 KNN_QB=16
+    omp_blocked  threads=6   median=0.5029s mean=0.5026s std=0.0054s min=0.4953s max=0.5104s cpu=2.9393s acc=0.9688 mismatches=0
+[19:05:33] build/omp_blocked4 t=6   sched=static      KNN_TB=8 KNN_QB=16
+    omp_blocked4 threads=6   median=0.2821s mean=0.2849s std=0.0156s min=0.2732s max=0.3115s cpu=1.5646s acc=0.9688 mismatches=0
+[19:05:35] build/omp_blocked  t=6   sched=static      KNN_TB=16 KNN_QB=16
+    omp_blocked  threads=6   median=0.5016s mean=0.5020s std=0.0018s min=0.4997s max=0.5048s cpu=2.9301s acc=0.9688 mismatches=0
+[19:05:39] build/omp_blocked4 t=6   sched=static      KNN_TB=16 KNN_QB=16
+    omp_blocked4 threads=6   median=0.2786s mean=0.2767s std=0.0132s min=0.2562s max=0.2898s cpu=1.5230s acc=0.9688 mismatches=0
+[19:05:40] build/omp_blocked  t=6   sched=static      KNN_TB=32 KNN_QB=16
+    omp_blocked  threads=6   median=0.5109s mean=0.5073s std=0.0079s min=0.4972s max=0.5152s cpu=2.9490s acc=0.9688 mismatches=0
+[19:05:44] build/omp_blocked4 t=6   sched=static      KNN_TB=32 KNN_QB=16
+    omp_blocked4 threads=6   median=0.2880s mean=0.2843s std=0.0090s min=0.2690s max=0.2918s cpu=1.6178s acc=0.9688 mismatches=0
+[19:05:45] build/omp_blocked  t=6   sched=static      KNN_TB=64 KNN_QB=16
+    omp_blocked  threads=6   median=0.5360s mean=0.5465s std=0.0233s min=0.5283s max=0.5841s cpu=3.1308s acc=0.9688 mismatches=0
+[19:05:49] build/omp_blocked4 t=6   sched=static      KNN_TB=64 KNN_QB=16
+    omp_blocked4 threads=6   median=0.2666s mean=0.2702s std=0.0228s min=0.2440s max=0.3047s cpu=1.5053s acc=0.9688 mismatches=0
+[19:05:51] build/omp_blocked  t=6   sched=static      KNN_TB=128 KNN_QB=16
+    omp_blocked  threads=6   median=0.5843s mean=0.5872s std=0.0086s min=0.5786s max=0.6010s cpu=3.4110s acc=0.9688 mismatches=0
+[19:05:55] build/omp_blocked4 t=6   sched=static      KNN_TB=128 KNN_QB=16
+    omp_blocked4 threads=6   median=0.3146s mean=0.3076s std=0.0189s min=0.2867s max=0.3263s cpu=1.7794s acc=0.9688 mismatches=0
+[19:05:57] build/omp_blocked  t=6   sched=static      KNN_TB=256 KNN_QB=16
+    omp_blocked  threads=6   median=0.6509s mean=0.6497s std=0.0230s min=0.6160s max=0.6807s cpu=3.7563s acc=0.9688 mismatches=0
+[19:06:01] build/omp_blocked4 t=6   sched=static      KNN_TB=256 KNN_QB=16
+    omp_blocked4 threads=6   median=0.3540s mean=0.3512s std=0.0222s min=0.3171s max=0.3785s cpu=2.0163s acc=0.9688 mismatches=0
+[19:06:03] build/omp_blocked  t=6   sched=static      KNN_TB=8 KNN_QB=32
+    omp_blocked  threads=6   median=0.4775s mean=0.4767s std=0.0040s min=0.4719s max=0.4817s cpu=2.7459s acc=0.9688 mismatches=0
+[19:06:06] build/omp_blocked4 t=6   sched=static      KNN_TB=8 KNN_QB=32
+    omp_blocked4 threads=6   median=0.2424s mean=0.2509s std=0.0214s min=0.2273s max=0.2739s cpu=1.3241s acc=0.9688 mismatches=0
+[19:06:08] build/omp_blocked  t=6   sched=static      KNN_TB=16 KNN_QB=32
+    omp_blocked  threads=6   median=0.4765s mean=0.4770s std=0.0079s min=0.4660s max=0.4868s cpu=2.8066s acc=0.9688 mismatches=0
+[19:06:11] build/omp_blocked4 t=6   sched=static      KNN_TB=16 KNN_QB=32
+    omp_blocked4 threads=6   median=0.2440s mean=0.2454s std=0.0133s min=0.2272s max=0.2636s cpu=1.3243s acc=0.9688 mismatches=0
+[19:06:12] build/omp_blocked  t=6   sched=static      KNN_TB=32 KNN_QB=32
+    omp_blocked  threads=6   median=0.4771s mean=0.4806s std=0.0052s min=0.4766s max=0.4866s cpu=2.7789s acc=0.9688 mismatches=0
+[19:06:15] build/omp_blocked4 t=6   sched=static      KNN_TB=32 KNN_QB=32
+    omp_blocked4 threads=6   median=0.2468s mean=0.2521s std=0.0230s min=0.2281s max=0.2796s cpu=1.4141s acc=0.9688 mismatches=0
+[19:06:17] build/omp_blocked  t=6   sched=static      KNN_TB=64 KNN_QB=32
+    omp_blocked  threads=6   median=0.5125s mean=0.5160s std=0.0145s min=0.5047s max=0.5402s cpu=2.9466s acc=0.9688 mismatches=0
+[19:06:20] build/omp_blocked4 t=6   sched=static      KNN_TB=64 KNN_QB=32
+    omp_blocked4 threads=6   median=0.2492s mean=0.2507s std=0.0136s min=0.2382s max=0.2720s cpu=1.3480s acc=0.9688 mismatches=0
+[19:06:22] build/omp_blocked  t=6   sched=static      KNN_TB=128 KNN_QB=32
+    omp_blocked  threads=6   median=0.5488s mean=0.5526s std=0.0072s min=0.5476s max=0.5648s cpu=3.1698s acc=0.9688 mismatches=0
+[19:06:26] build/omp_blocked4 t=6   sched=static      KNN_TB=128 KNN_QB=32
+    omp_blocked4 threads=6   median=0.2273s mean=0.2254s std=0.0086s min=0.2105s max=0.2316s cpu=1.2253s acc=0.9688 mismatches=0
+[19:06:27] build/omp_blocked  t=6   sched=static      KNN_TB=256 KNN_QB=32
+    omp_blocked  threads=6   median=0.4643s mean=0.4657s std=0.0186s min=0.4418s max=0.4931s cpu=2.6566s acc=0.9688 mismatches=0
+[19:06:30] build/omp_blocked4 t=6   sched=static      KNN_TB=256 KNN_QB=32
+    omp_blocked4 threads=6   median=0.2385s mean=0.2376s std=0.0165s min=0.2165s max=0.2608s cpu=1.2834s acc=0.9688 mismatches=0
+
+results: results/raw/tiles_20261115_190410.csv
+[19:06:32] build/omp_blocked  t=12  sched=static      KNN_TB=8 KNN_QB=4
+    omp_blocked  threads=12  median=0.6520s mean=0.6851s std=0.0894s min=0.6075s max=0.8081s cpu=7.3237s acc=0.9688 mismatches=0
+[19:06:36] build/omp_blocked4 t=12  sched=static      KNN_TB=8 KNN_QB=4
+    omp_blocked4 threads=12  median=0.5216s mean=0.5162s std=0.0282s min=0.4716s max=0.5432s cpu=5.7301s acc=0.9688 mismatches=0
+[19:06:39] build/omp_blocked  t=12  sched=static      KNN_TB=16 KNN_QB=4
+    omp_blocked  threads=12  median=2.7683s mean=2.6358s std=0.6602s min=1.8444s max=3.5519s cpu=19.8697s acc=0.9688 mismatches=0
+[19:07:47] build/omp_blocked4 t=12  sched=static      KNN_TB=16 KNN_QB=4
+    omp_blocked4 threads=12  median=1.3154s mean=1.3436s std=0.2060s min=1.1736s max=1.6837s cpu=13.6012s acc=0.9688 mismatches=0
+[19:07:57] build/omp_blocked  t=12  sched=static      KNN_TB=32 KNN_QB=4
+    omp_blocked  threads=12  median=1.2342s mean=1.2554s std=0.0429s min=1.2122s max=1.3193s cpu=13.7729s acc=0.9688 mismatches=0
+[19:08:05] build/omp_blocked4 t=12  sched=static      KNN_TB=32 KNN_QB=4
+    omp_blocked4 threads=12  median=1.0442s mean=1.0745s std=0.0926s min=1.0079s max=1.2317s cpu=12.1483s acc=0.9688 mismatches=0
+[19:08:12] build/omp_blocked  t=12  sched=static      KNN_TB=64 KNN_QB=4
+    omp_blocked  threads=12  median=1.1782s mean=1.1997s std=0.0370s min=1.1723s max=1.2552s cpu=13.3256s acc=0.9688 mismatches=0
+[19:08:19] build/omp_blocked4 t=12  sched=static      KNN_TB=64 KNN_QB=4
+    omp_blocked4 threads=12  median=1.3937s mean=1.3295s std=0.3171s min=1.0222s max=1.7836s cpu=15.5233s acc=0.9688 mismatches=0
+[19:08:27] build/omp_blocked  t=12  sched=static      KNN_TB=128 KNN_QB=4
+    omp_blocked  threads=12  median=1.6912s mean=1.7597s std=0.3152s min=1.4410s max=2.2820s cpu=18.4761s acc=0.9688 mismatches=0
+[19:08:39] build/omp_blocked4 t=12  sched=static      KNN_TB=128 KNN_QB=4
+    omp_blocked4 threads=12  median=0.9722s mean=0.9825s std=0.0495s min=0.9382s max=1.0631s cpu=10.8961s acc=0.9688 mismatches=0
+[19:08:45] build/omp_blocked  t=12  sched=static      KNN_TB=256 KNN_QB=4
+    omp_blocked  threads=12  median=2.1374s mean=2.1460s std=0.1680s min=1.9275s max=2.3494s cpu=24.0772s acc=0.9688 mismatches=0
+[19:08:58] build/omp_blocked4 t=12  sched=static      KNN_TB=256 KNN_QB=4
+    omp_blocked4 threads=12  median=1.0736s mean=1.1002s std=0.1300s min=1.0046s max=1.3222s cpu=12.2941s acc=0.9688 mismatches=0
+[19:09:05] build/omp_blocked  t=12  sched=static      KNN_TB=8 KNN_QB=8
+    omp_blocked  threads=12  median=0.6102s mean=0.6110s std=0.0089s min=0.5998s max=0.6230s cpu=6.9899s acc=0.9688 mismatches=0
+[19:09:09] build/omp_blocked4 t=12  sched=static      KNN_TB=8 KNN_QB=8
+    omp_blocked4 threads=12  median=0.4990s mean=0.5086s std=0.0328s min=0.4862s max=0.5664s cpu=5.7256s acc=0.9688 mismatches=0
+[19:09:13] build/omp_blocked  t=12  sched=static      KNN_TB=16 KNN_QB=8
+    omp_blocked  threads=12  median=0.7760s mean=0.7870s std=0.1172s min=0.6559s max=0.9521s cpu=8.6167s acc=0.9688 mismatches=0
+[19:09:18] build/omp_blocked4 t=12  sched=static      KNN_TB=16 KNN_QB=8
+    omp_blocked4 threads=12  median=0.7158s mean=0.7227s std=0.1085s min=0.5658s max=0.8568s cpu=8.0765s acc=0.9688 mismatches=0
+[19:09:22] build/omp_blocked  t=12  sched=static      KNN_TB=32 KNN_QB=8
+    omp_blocked  threads=12  median=0.7768s mean=0.8041s std=0.1099s min=0.6666s max=0.9601s cpu=8.6095s acc=0.9688 mismatches=0
+[19:09:27] build/omp_blocked4 t=12  sched=static      KNN_TB=32 KNN_QB=8
+    omp_blocked4 threads=12  median=0.7410s mean=0.7490s std=0.0762s min=0.6646s max=0.8527s cpu=8.2982s acc=0.9688 mismatches=0
+[19:09:32] build/omp_blocked  t=12  sched=static      KNN_TB=64 KNN_QB=8
+    omp_blocked  threads=12  median=0.9561s mean=0.9695s std=0.0811s min=0.8804s max=1.0611s cpu=10.7105s acc=0.9688 mismatches=0
+[19:09:38] build/omp_blocked4 t=12  sched=static      KNN_TB=64 KNN_QB=8
+    omp_blocked4 threads=12  median=0.6016s mean=0.6209s std=0.0690s min=0.5605s max=0.7228s cpu=6.6836s acc=0.9688 mismatches=0
+[19:09:42] build/omp_blocked  t=12  sched=static      KNN_TB=128 KNN_QB=8
+    omp_blocked  threads=12  median=1.3107s mean=1.2807s std=0.1027s min=1.1131s max=1.3826s cpu=14.0319s acc=0.9688 mismatches=0
+[19:09:51] build/omp_blocked4 t=12  sched=static      KNN_TB=128 KNN_QB=8
+    omp_blocked4 threads=12  median=0.9720s mean=0.9541s std=0.1433s min=0.7662s max=1.1078s cpu=9.9894s acc=0.9688 mismatches=0
+[19:09:57] build/omp_blocked  t=12  sched=static      KNN_TB=256 KNN_QB=8
+    omp_blocked  threads=12  median=1.6401s mean=1.7133s std=0.1939s min=1.5006s max=1.9924s cpu=17.9967s acc=0.9688 mismatches=0
+[19:10:07] build/omp_blocked4 t=12  sched=static      KNN_TB=256 KNN_QB=8
+    omp_blocked4 threads=12  median=0.9806s mean=0.9587s std=0.1128s min=0.8216s max=1.0929s cpu=10.6223s acc=0.9688 mismatches=0
+[19:10:13] build/omp_blocked  t=12  sched=static      KNN_TB=8 KNN_QB=16
+    omp_blocked  threads=12  median=0.5411s mean=0.5628s std=0.0545s min=0.5358s max=0.6602s cpu=6.1995s acc=0.9688 mismatches=0
+[19:10:17] build/omp_blocked4 t=12  sched=static      KNN_TB=8 KNN_QB=16
+    omp_blocked4 threads=12  median=0.4202s mean=0.3879s std=0.0583s min=0.3128s max=0.4426s cpu=4.6443s acc=0.9688 mismatches=0
+[19:10:20] build/omp_blocked  t=12  sched=static      KNN_TB=16 KNN_QB=16
+    omp_blocked  threads=12  median=0.5408s mean=0.5787s std=0.0963s min=0.5255s max=0.7505s cpu=6.2107s acc=0.9688 mismatches=0
+[19:10:24] build/omp_blocked4 t=12  sched=static      KNN_TB=16 KNN_QB=16
+    omp_blocked4 threads=12  median=0.3323s mean=0.3644s std=0.0647s min=0.3094s max=0.4555s cpu=3.7872s acc=0.9688 mismatches=0
+[19:10:26] build/omp_blocked  t=12  sched=static      KNN_TB=32 KNN_QB=16
+    omp_blocked  threads=12  median=0.5425s mean=0.5701s std=0.0532s min=0.5331s max=0.6601s cpu=6.1610s acc=0.9688 mismatches=0
+[19:10:30] build/omp_blocked4 t=12  sched=static      KNN_TB=32 KNN_QB=16
+    omp_blocked4 threads=12  median=0.3072s mean=0.3072s std=0.0076s min=0.2976s max=0.3178s cpu=3.5723s acc=0.9688 mismatches=0
+[19:10:32] build/omp_blocked  t=12  sched=static      KNN_TB=64 KNN_QB=16
+    omp_blocked  threads=12  median=0.6497s mean=0.6560s std=0.0429s min=0.6114s max=0.7272s cpu=7.4127s acc=0.9688 mismatches=0
+[19:10:36] build/omp_blocked4 t=12  sched=static      KNN_TB=64 KNN_QB=16
+    omp_blocked4 threads=12  median=0.3360s mean=0.3443s std=0.0231s min=0.3213s max=0.3818s cpu=3.8131s acc=0.9688 mismatches=0
+[19:10:39] build/omp_blocked  t=12  sched=static      KNN_TB=128 KNN_QB=16
+    omp_blocked  threads=12  median=0.7692s mean=0.7988s std=0.0840s min=0.7202s max=0.9033s cpu=8.7014s acc=0.9688 mismatches=0
+[19:10:44] build/omp_blocked4 t=12  sched=static      KNN_TB=128 KNN_QB=16
+    omp_blocked4 threads=12  median=0.6131s mean=0.5909s std=0.1301s min=0.3691s max=0.6949s cpu=6.7362s acc=0.9688 mismatches=0
+[19:10:48] build/omp_blocked  t=12  sched=static      KNN_TB=256 KNN_QB=16
+    omp_blocked  threads=12  median=0.8424s mean=0.8611s std=0.0963s min=0.7698s max=1.0040s cpu=9.5813s acc=0.9688 mismatches=0
+[19:10:54] build/omp_blocked4 t=12  sched=static      KNN_TB=256 KNN_QB=16
+    omp_blocked4 threads=12  median=0.6089s mean=0.6041s std=0.0788s min=0.5248s max=0.7238s cpu=6.8452s acc=0.9688 mismatches=0
+[19:10:58] build/omp_blocked  t=12  sched=static      KNN_TB=8 KNN_QB=32
+    omp_blocked  threads=12  median=0.6620s mean=0.7097s std=0.1835s min=0.5553s max=1.0114s cpu=7.0360s acc=0.9688 mismatches=0
+[19:11:02] build/omp_blocked4 t=12  sched=static      KNN_TB=8 KNN_QB=32
+    omp_blocked4 threads=12  median=0.3403s mean=0.3369s std=0.0196s min=0.3036s max=0.3550s cpu=3.8785s acc=0.9688 mismatches=0
+[19:11:05] build/omp_blocked  t=12  sched=static      KNN_TB=16 KNN_QB=32
+    omp_blocked  threads=12  median=0.6335s mean=0.6726s std=0.0783s min=0.5985s max=0.7808s cpu=7.0895s acc=0.9688 mismatches=0
+[19:11:09] build/omp_blocked4 t=12  sched=static      KNN_TB=16 KNN_QB=32
+    omp_blocked4 threads=12  median=0.3325s mean=0.3442s std=0.0274s min=0.3194s max=0.3787s cpu=3.7763s acc=0.9688 mismatches=0
+[19:11:12] build/omp_blocked  t=12  sched=static      KNN_TB=32 KNN_QB=32
+    omp_blocked  threads=12  median=0.5673s mean=0.5825s std=0.0527s min=0.5259s max=0.6669s cpu=6.4772s acc=0.9688 mismatches=0
+[19:11:16] build/omp_blocked4 t=12  sched=static      KNN_TB=32 KNN_QB=32
+    omp_blocked4 threads=12  median=0.3411s mean=0.3338s std=0.0219s min=0.3104s max=0.3627s cpu=3.8656s acc=0.9688 mismatches=0
+[19:11:18] build/omp_blocked  t=12  sched=static      KNN_TB=64 KNN_QB=32
+    omp_blocked  threads=12  median=0.7486s mean=0.7577s std=0.1097s min=0.6547s max=0.9327s cpu=8.3957s acc=0.9688 mismatches=0
+[19:11:23] build/omp_blocked4 t=12  sched=static      KNN_TB=64 KNN_QB=32
+    omp_blocked4 threads=12  median=0.3293s mean=0.3288s std=0.0122s min=0.3140s max=0.3433s cpu=3.8203s acc=0.9688 mismatches=0
+[19:11:25] build/omp_blocked  t=12  sched=static      KNN_TB=128 KNN_QB=32
+    omp_blocked  threads=12  median=0.8266s mean=0.8238s std=0.0756s min=0.7347s max=0.9325s cpu=9.1143s acc=0.9688 mismatches=0
+[19:11:31] build/omp_blocked4 t=12  sched=static      KNN_TB=128 KNN_QB=32
+    omp_blocked4 threads=12  median=0.3604s mean=0.3728s std=0.0267s min=0.3484s max=0.4025s cpu=4.1356s acc=0.9688 mismatches=0
+[19:11:33] build/omp_blocked  t=12  sched=static      KNN_TB=256 KNN_QB=32
+    omp_blocked  threads=12  median=0.7947s mean=0.8081s std=0.0882s min=0.6888s max=0.9237s cpu=9.0495s acc=0.9688 mismatches=0
+[19:11:38] build/omp_blocked4 t=12  sched=static      KNN_TB=256 KNN_QB=32
+    omp_blocked4 threads=12  median=0.5272s mean=0.5185s std=0.0591s min=0.4539s max=0.5822s cpu=5.8035s acc=0.9688 mismatches=0
+
+results: results/raw/tiles_20261115_190632.csv
+[19:11:42] build/omp_naive    t=1   sched=static      --n-test 10000 --n-train 64
+    omp_naive    threads=1   median=0.9910s mean=0.9183s std=0.1393s min=0.6912s max=1.0195s cpu=0.9862s acc=0.5961 mismatches=0
+[19:11:48] build/omp_simd     t=1   sched=static      --n-test 10000 --n-train 64
+    omp_simd     threads=1   median=0.0943s mean=0.1047s std=0.0235s min=0.0922s max=0.1465s cpu=0.0936s acc=0.5961 mismatches=0
+[19:11:48] build/omp_soa      t=1   sched=static      --n-test 10000 --n-train 64
+    omp_soa      threads=1   median=0.0502s mean=0.0513s std=0.0090s min=0.0392s max=0.0635s cpu=0.0502s acc=0.5961 mismatches=0
+[19:11:49] build/omp_aosoa    t=1   sched=static      --n-test 10000 --n-train 64
+    omp_aosoa    threads=1   median=0.0414s mean=0.0422s std=0.0044s min=0.0378s max=0.0496s cpu=0.0414s acc=0.5961 mismatches=0
+[19:11:49] build/omp_simd     t=6   sched=static      --n-test 10000 --n-train 64
+    omp_simd     threads=6   median=0.0258s mean=0.0259s std=0.0003s min=0.0257s max=0.0263s cpu=0.1463s acc=0.5961 mismatches=0
+[19:11:49] build/omp_soa      t=6   sched=static      --n-test 10000 --n-train 64
+    omp_soa      threads=6   median=0.0138s mean=0.0139s std=0.0004s min=0.0134s max=0.0144s cpu=0.0802s acc=0.5961 mismatches=0
+[19:11:49] build/omp_aosoa    t=6   sched=static      --n-test 10000 --n-train 64
+    omp_aosoa    threads=6   median=0.0136s mean=0.0133s std=0.0014s min=0.0114s max=0.0146s cpu=0.0723s acc=0.5961 mismatches=0
+[19:11:49] build/omp_naive    t=6   sched=static      --n-test 10000 --n-train 64
+    omp_naive    threads=6   median=0.1610s mean=0.1611s std=0.0007s min=0.1602s max=0.1619s cpu=0.9629s acc=0.5961 mismatches=0
+[19:11:50] build/omp_soa      t=1   sched=static      --n-test 2000 --n-train 2000
+    omp_soa      threads=1   median=0.5551s mean=0.5797s std=0.0705s min=0.5360s max=0.7050s cpu=0.5550s acc=0.8660 mismatches=0
+[19:11:54] build/omp_aosoa    t=1   sched=static      --n-test 2000 --n-train 2000
+    omp_aosoa    threads=1   median=0.4522s mean=0.4648s std=0.0264s min=0.4412s max=0.4939s cpu=0.4521s acc=0.8660 mismatches=0
+[19:11:57] build/omp_naive    t=1   sched=static      --n-test 2000 --n-train 2000
+    omp_naive    threads=1   median=6.1555s mean=5.9523s std=0.8179s min=4.8200s max=6.9339s cpu=6.1547s acc=0.8660 mismatches=0
+[19:12:31] build/omp_simd     t=1   sched=static      --n-test 2000 --n-train 2000
+    omp_simd     threads=1   median=1.2901s mean=1.1670s std=0.2150s min=0.8627s max=1.3539s cpu=1.2899s acc=0.8660 mismatches=0
+[19:12:38] build/omp_aosoa    t=6   sched=static      --n-test 2000 --n-train 2000
+    omp_aosoa    threads=6   median=0.1428s mean=0.1420s std=0.0067s min=0.1328s max=0.1501s cpu=0.8079s acc=0.8660 mismatches=0
+[19:12:39] build/omp_naive    t=6   sched=static      --n-test 2000 --n-train 2000
+    omp_naive    threads=6   median=0.9963s mean=0.9994s std=0.0052s min=0.9948s max=1.0066s cpu=5.9528s acc=0.8660 mismatches=0
+[19:12:45] build/omp_simd     t=6   sched=static      --n-test 2000 --n-train 2000
+    omp_simd     threads=6   median=0.1744s mean=0.1760s std=0.0073s min=0.1673s max=0.1859s cpu=1.0402s acc=0.8660 mismatches=0
+[19:12:46] build/omp_soa      t=6   sched=static      --n-test 2000 --n-train 2000
+    omp_soa      threads=6   median=0.2016s mean=0.2008s std=0.0048s min=0.1954s max=0.2062s cpu=1.1575s acc=0.8660 mismatches=0
+[19:12:48] build/omp_naive    t=1   sched=static      --n-test 100 --n-train 60000
+    omp_naive    threads=1   median=8.4479s mean=8.2639s std=0.3799s min=7.6113s max=8.5207s cpu=8.4439s acc=0.9900 mismatches=0
+[19:13:37] build/omp_simd     t=1   sched=static      --n-test 100 --n-train 60000
+    omp_simd     threads=1   median=2.3805s mean=2.2605s std=0.4566s min=1.7502s max=2.8677s cpu=2.3802s acc=0.9900 mismatches=0
+[19:13:50] build/omp_soa      t=1   sched=static      --n-test 100 --n-train 60000
+    omp_soa      threads=1   median=2.7936s mean=3.0948s std=0.8052s min=2.3788s max=4.2397s cpu=2.7918s acc=0.9900 mismatches=0
+[19:14:11] build/omp_aosoa    t=1   sched=static      --n-test 100 --n-train 60000
+    omp_aosoa    threads=1   median=2.0271s mean=2.0749s std=0.1224s min=1.9726s max=2.2665s cpu=2.0266s acc=0.9900 mismatches=0
+[19:14:25] build/omp_simd     t=6   sched=static      --n-test 100 --n-train 60000
+    omp_simd     threads=6   median=0.4156s mean=0.4240s std=0.0755s min=0.3236s max=0.5264s cpu=2.4874s acc=0.9900 mismatches=0
+[19:14:27] build/omp_soa      t=6   sched=static      --n-test 100 --n-train 60000
+    omp_soa      threads=6   median=1.1995s mean=1.2581s std=0.1448s min=1.0935s max=1.4615s cpu=6.9375s acc=0.9900 mismatches=0
+[19:14:35] build/omp_aosoa    t=6   sched=static      --n-test 100 --n-train 60000
+    omp_aosoa    threads=6   median=0.4264s mean=0.4270s std=0.0361s min=0.3793s max=0.4800s cpu=2.4290s acc=0.9900 mismatches=0
+[19:14:38] build/omp_naive    t=6   sched=static      --n-test 100 --n-train 60000
+    omp_naive    threads=6   median=1.6540s mean=1.6706s std=0.1198s min=1.5575s max=1.8699s cpu=9.6970s acc=0.9900 mismatches=0
+
+results: results/raw/cachefit_20261115_191142.csv
+[19:14:48] build/omp_naive    t=1   sched=static      --n-test 10000 --n-train 64
+    omp_naive    threads=1   median=0.6795s mean=0.7461s std=0.1240s min=0.6564s max=0.9563s cpu=0.6795s acc=0.5961 mismatches=0
+[19:14:53] build/omp_simd     t=1   sched=static      --n-test 10000 --n-train 64
+    omp_simd     threads=1   median=0.1194s mean=0.1205s std=0.0033s min=0.1174s max=0.1257s cpu=0.1194s acc=0.5961 mismatches=0
+[19:14:54] build-novec/omp_simd     t=1   sched=static      --n-test 10000 --n-train 64
+    omp_simd     threads=1   median=0.1189s mean=0.1194s std=0.0019s min=0.1170s max=0.1219s cpu=0.1188s acc=0.5961 mismatches=0
+[19:14:55] build-novec/omp_naive    t=1   sched=static      --n-test 10000 --n-train 64
+    omp_naive    threads=1   median=1.1398s mean=1.1369s std=0.1271s min=0.9833s max=1.2814s cpu=1.1382s acc=0.5961 mismatches=0
+[19:15:01] build/omp_naive    t=1   sched=static      --n-test 100 --n-train 60000
+    omp_naive    threads=1   median=9.7699s mean=9.8413s std=1.1286s min=8.2308s max=11.2566s cpu=9.7629s acc=0.9900 mismatches=0
+[19:16:03] build/omp_simd     t=1   sched=static      --n-test 100 --n-train 60000
+    omp_simd     threads=1   median=2.9953s mean=2.9745s std=0.1781s min=2.7330s max=3.1468s cpu=2.9951s acc=0.9900 mismatches=0
+[19:16:21] build-novec/omp_simd     t=1   sched=static      --n-test 100 --n-train 60000
+    omp_simd     threads=1   median=3.1823s mean=3.1316s std=0.1915s min=2.8610s max=3.3504s cpu=3.1739s acc=0.9900 mismatches=0
+[19:16:41] build-novec/omp_naive    t=1   sched=static      --n-test 100 --n-train 60000
+    omp_naive    threads=1   median=10.7321s mean=10.7757s std=1.3992s min=9.0910s max=12.3341s cpu=10.7308s acc=0.9900 mismatches=0
+
+results: results/raw/vec_20261115_191448.csv
+[19:17:47] build/seq          t=1   sched=static      --metric euclidean --k 1
+    seq          threads=1   median=30.8273s mean=31.8670s std=4.9133s min=25.7642s max=38.9626s cpu=30.8232s acc=0.9740 mismatches=0
+[19:21:04] build/omp_blocked4 t=12  sched=static      --metric euclidean --k 1
+    omp_blocked4 threads=12  median=0.3428s mean=0.3461s std=0.0308s min=0.3081s max=0.3938s cpu=3.8506s acc=0.9740 mismatches=0
+[19:21:07] build/seq          t=1   sched=static      --metric euclidean --k 5
+    seq          threads=1   median=28.8333s mean=28.8603s std=0.8454s min=28.0889s max=30.2319s cpu=28.8277s acc=0.9688 mismatches=0
+[19:24:09] build/omp_blocked4 t=12  sched=static      --metric euclidean --k 5
+    omp_blocked4 threads=12  median=0.3585s mean=0.3623s std=0.0331s min=0.3282s max=0.4164s cpu=4.0635s acc=0.9688 mismatches=0
+[19:24:12] build/seq          t=1   sched=static      --metric euclidean --k 10
+    seq          threads=1   median=24.9788s mean=26.4575s std=3.2888s min=23.6261s max=30.5501s cpu=24.9739s acc=0.9661 mismatches=0
+[19:26:54] build/omp_blocked4 t=12  sched=static      --metric euclidean --k 10
+    omp_blocked4 threads=12  median=0.3341s mean=0.3557s std=0.0484s min=0.3295s max=0.4421s cpu=3.9286s acc=0.9661 mismatches=0
+[19:26:56] build/seq          t=1   sched=static      --metric cosine --k 1
+    seq          threads=1   median=23.6238s mean=24.0126s std=0.7772s min=23.3227s max=25.0366s cpu=23.6224s acc=0.9766 mismatches=0
+[19:29:26] build/omp_blocked4 t=12  sched=static      --metric cosine --k 1
+    omp_blocked4 threads=12  median=0.3881s mean=0.3885s std=0.0117s min=0.3789s max=0.4077s cpu=3.5467s acc=0.9766 mismatches=0
+[19:29:29] build/seq          t=1   sched=static      --metric cosine --k 5
+    seq          threads=1   median=23.6588s mean=23.7071s std=0.1463s min=23.5909s max=23.9585s cpu=23.6565s acc=0.9792 mismatches=0
+[19:31:52] build/omp_blocked4 t=12  sched=static      --metric cosine --k 5
+    omp_blocked4 threads=12  median=0.3809s mean=0.3817s std=0.0035s min=0.3782s max=0.3873s cpu=3.5574s acc=0.9792 mismatches=0
+[19:31:55] build/seq          t=1   sched=static      --metric cosine --k 10
+    seq          threads=1   median=36.2545s mean=32.4488s std=7.7492s min=23.3061s max=40.9608s cpu=36.2480s acc=0.9740 mismatches=0
+[19:35:01] build/omp_blocked4 t=12  sched=static      --metric cosine --k 10
+    omp_blocked4 threads=12  median=0.4173s mean=0.4180s std=0.0298s min=0.3780s max=0.4520s cpu=3.8473s acc=0.9740 mismatches=0
+
+results: results/raw/kmetric_20261115_191747.csv
+variant=omp_blocked4 threads=12 schedule=static train=60000x784 test=10000 k=1 metric=euclidean
+omp_blocked4 threads=12  median=9.6187s mean=9.6187s std=0.0000s min=9.6187s max=9.6187s cpu=109.9384s acc=0.9691 mismatches=-1
+variant=omp_blocked4 threads=12 schedule=static train=60000x784 test=10000 k=5 metric=euclidean
+omp_blocked4 threads=12  median=12.9666s mean=12.9666s std=0.0000s min=12.9666s max=12.9666s cpu=137.5372s acc=0.9693 mismatches=-1
+variant=omp_blocked4 threads=12 schedule=static train=60000x784 test=10000 k=10 metric=euclidean
+omp_blocked4 threads=12  median=15.4858s mean=15.4858s std=0.0000s min=15.4858s max=15.4858s cpu=160.5385s acc=0.9683 mismatches=-1
+variant=omp_blocked4 threads=12 schedule=static train=60000x784 test=10000 k=1 metric=cosine
+omp_blocked4 threads=12  median=9.2959s mean=9.2959s std=0.0000s min=9.2959s max=9.2959s cpu=107.0413s acc=0.9723 mismatches=-1
+variant=omp_blocked4 threads=12 schedule=static train=60000x784 test=10000 k=5 metric=cosine
+omp_blocked4 threads=12  median=8.8399s mean=8.8399s std=0.0000s min=8.8399s max=8.8399s cpu=99.9708s acc=0.9737 mismatches=-1
+variant=omp_blocked4 threads=12 schedule=static train=60000x784 test=10000 k=10 metric=cosine
+omp_blocked4 threads=12  median=9.0119s mean=9.0119s std=0.0000s min=9.0119s max=9.0119s cpu=101.7198s acc=0.9724 mismatches=-1
+### done

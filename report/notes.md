@@ -44,9 +44,12 @@ Formato suggerito (una voce per esperimento):
 - **Interpretazione:** ipotesi confermata in parte. Il guadagno SIMD (2.9×) è molto sotto
   8× già con 1 thread. Banda implicita con 1 thread: 18.8 GB letti / 1.72 s ≈ 11 GB/s,
   plausibile limite di banda di un singolo core → probabilmente memory-bound già da 1
-  thread. Con 6 thread la banda "apparente" sarebbe ~52 GB/s, sopra il picco DRAM (DDR4
-  dual channel ≈ 47 GB/s teorici): i thread con `static` avanzano in sincronia sul
-  training e si condividono le righe in L3. La scalabilità peggiore di simd (4.7× vs 5.7×)
+  thread. Con 6 thread la banda "apparente" sarebbe ~52 GB/s, sopra il picco DRAM:
+  i thread con `static` avanzano in sincronia sul training e si condividono le righe
+  in L3. **[Corretto 2026-11-15]** il portatile ha *un solo* modulo DDR4-2933 (single
+  channel, verificato con `Win32_PhysicalMemory`): picco ≈ 2933e6 × 8 B = **23.5 GB/s**,
+  non 47. I 52 GB/s apparenti sono quindi 2.2× il picco → la condivisione in L3 è
+  ancora più evidente. La scalabilità peggiore di simd (4.7× vs 5.7×)
   è coerente con un collo di bottiglia sulla memoria condivisa.
   0 mismatch nonostante il riordino: le distanze tra vicini diversi raramente differiscono
   di pochi ulp; da ricontrollare sulle 10000 query.
@@ -173,5 +176,176 @@ Formato suggerito (una voce per esperimento):
 - **Prossimo passo:** (1) sweep di TB e QB (`KNN_TB`, `KNN_QB`) per vedere il ginocchio
   quando il tile esce da L2; (2) misure controllate (portatile in carica) di
   strong scaling 1-12 thread per naive/simd/blocked; (3) più accumulatori nel kernel.
+- **Nota sul budget di cache [aggiunta dopo revisione]:** il commento originale diceva
+  che il tile da 100 KB sta in L2 "anche con 2 hyperthread". Ma ogni thread tiene anche
+  le sue 16 query (50 KB): 150 KB per thread, 2 × 150 = 300 KB > 256 KB con 2 thread per
+  core. Probabilmente le query vengono servite da L3 oltre i 6 thread: lo sweep TB × QB
+  a 6 e 12 thread lo mostra. Commento nel codice corretto.
+- **Nota sulla granularità [aggiunta dopo revisione]:** con 192 query e QB=16 i blocchi
+  sono 12: a 8 thread 4 thread fanno 2 blocchi e 4 ne fanno 1 → efficienza massima
+  teorica 12/(8·2) = 75%, un artefatto. Da qui in poi `--n-test 384` = 24 blocchi,
+  divisibile per 1, 2, 4, 6, 8, 12.
+
+---
+
+## 2026-11-15 — Revisione della metodologia (prima della campagna ufficiale)
+- **Metriche (plot_results.py):** l'efficienza era `T_seq / T_p / p`. Per le varianti
+  SIMD lo speedup rispetto a seq è già > 1 con un thread (omp_blocked ≈ 4×), quindi
+  quella "efficienza" superava 1 e mescolava guadagno SIMD e guadagno dei thread. Ora:
+  - **speedup** = T_seq / T_p (definizione della traccia: guadagno totale);
+  - **scalabilità** = T_variante(1) / T_variante(p) (solo il guadagno dei thread);
+  - **efficienza** = scalabilità / p.
+- **Tempo CPU:** il driver misura anche `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)` attorno
+  alla chiamata (colonna `cpu_s`). CPU / wall = numero medio di core occupati. NB: un core
+  in stallo sulla memoria conta come occupato, e i thread che aspettano a una barriera
+  OpenMP fanno spin (consumano CPU): il tempo CPU non distingue calcolo e attesa.
+- **Run order e binding:** `run_benchmarks.py` ruota l'ordine delle varianti a ogni
+  punto (la deriva termica non penalizza sempre la stessa) e usa sempre
+  `OMP_PROC_BIND=close OMP_PLACES=cores`. Bug trovato: con >6 thread usava
+  `OMP_PLACES=threads`; su questa macchina le CPU 0-1, 2-3, … sono hyperthread dello
+  stesso core (`lscpu -e`), quindi 8 thread `close` finivano su 4 core soltanto.
+- **RAM:** un solo modulo DDR4 16 GB a 2933 MT/s (slot ChannelA vuoto) → single channel,
+  picco 23.5 GB/s. Condizioni di misura verificate: alimentazione da rete (batteria
+  100%), piano energetico "Prestazioni elevate".
+
+## 2026-11-15 — Varianza di omp_simd a 6 thread
+- **Ipotesi:** la varianza (0.35-1.10 s) dipende dal posizionamento dei thread (senza
+  binding due thread possono finire sullo stesso core).
+- **Comando:** `bash scripts/variance_probe.sh` (384 query, 10 run, 5 configurazioni)
+- **File risultati:** `results/raw/variance_20261115_184437.csv`
+- **Risultato:** mediane 1.33-1.38 s in *tutte* le configurazioni (unbound, close/cores,
+  spread/threads, close/threads). `close/threads` mette 6 thread su **3 core** (CPU 0-5)
+  eppure è veloce uguale. Un run isolato di close/cores ha impiegato 4.30 s (mediana 1.38).
+- **Interpretazione:** ipotesi smentita. (1) omp_simd è così memory-bound che 3 o 6 core
+  danno lo stesso tempo: conta solo la banda condivisa. (2) La varianza viene da outlier
+  sporadici (attività dell'host Windows / WSL), non dal binding. Con 384 query: 39.9
+  GFLOP/s, coerente con i 38.7 misurati con 100 query; l'anomalia del run a 192 query
+  era transitoria. Banda apparente 384 × 188 MB / 1.35 s ≈ 53 GB/s = 2.3× il picco
+  DRAM → righe condivise in L3. → Usare la **mediana** (robusta agli outlier) e
+  riportare min/max.
+
+## 2026-11-15 — AoS vs SoA vs AoSoA (prove preliminari, 3 run)
+- **Ipotesi:** SoA (feature-major) vettorizza su 64 campioni di training con 8
+  accumulatori indipendenti, senza riduzione orizzontale → kernel più veloce di AoS.
+- **Assembly** (omp_soa): 8 `vfmadd231ps` per feature su 8 registri accumulatori
+  diversi (ymm1, ymm3-9), nessuno spill: kernel ideale, nessuna catena di dipendenza.
+- **Risultato** (1 thread, mediana; la trasposta è inclusa nel tempo):
+
+  | training     | AoS (simd) | SoA     | AoSoA   |
+  |--------------|------------|---------|---------|
+  | 64 (L2)      | 0.069 s    | 0.029 s | 0.031 s |
+  | 2000 (L3)    | 0.59 s     | 0.47 s  | –       |
+  | 60000 (DRAM) | 1.75 s     | 2.17 s  | 1.82 s  |
+
+  Trasposta di 188 MB: 0.11-0.14 s (1 thread), 0.07-0.11 s (6 thread). 0 mismatch: la
+  somma per campione è in ordine di feature come nello scalare (con FMA).
+- **Interpretazione:** in L2 SoA è **2.3× più veloce** di AoS (≈ 50 GFLOP/s a 1
+  thread): ipotesi confermata sul kernel. Su MNIST completo SoA puro *perde*: per un
+  blocco di 64 campioni legge 784 righe distanti 240 KB → 784 flussi concorrenti, una
+  pagina nuova a ogni passo: il prefetcher hardware non li segue e il TLB manca.
+  AoSoA (blocchi contigui [784][64] = 200 KB) recupera il pattern sequenziale e torna
+  alla pari con AoS: in DRAM tutte e due sono memory-bound, il layout conta poco.
+  Conclusione: il vantaggio del layout SoA si vede solo se i dati vengono riusati dalla
+  cache → **AoSoA + blocking** è il prossimo passo naturale.
+
+---
+
+## 2026-11-15 — Campagna ufficiale (`run_all.sh`): ATTENZIONE metà non valida
+- **Commit:** `c33260f`. Log: `results/raw/run_all_20261115.log`.
+- **Problema:** il caricatore è stato staccato durante la campagna (100% in carica
+  all'avvio, 71% in scarica alla fine). Lo stesso `seq` k=5 euclidea passa da 19.1 s
+  (18:47) a 28.8 s (19:30). Validi: `threads` e `schedule` (18:47-19:04, tempi coerenti
+  con le prove del pomeriggio). **Non validi:** `tiles`, `cachefit`, `vec`, `kmetric`
+  (spostati in `results/raw/invalid_battery/`, da rifare in carica). Restano valide le
+  accuratezze (`accuracy_full_*.csv`), che non dipendono dalla velocità.
+- **Lezione di metodologia:** controllare l'alimentazione anche *durante* la campagna
+  (es. `system_info.sh` all'inizio e alla fine di ogni esperimento) e ripetere un run
+  di riferimento (seq) in fondo per accorgersi della deriva.
+
+## 2026-11-15 — Strong scaling 1-12 thread (valido)
+- **Configurazione:** MNIST 60000 × 384 query, k=5, euclidea, `static`,
+  `OMP_PROC_BIND=close OMP_PLACES=cores`, 5 run + 1 warm-up, ordine varianti ruotato.
+- **Comando:** `python3 scripts/run_benchmarks.py threads --variants omp_naive,omp_simd,omp_soa,omp_aosoa,omp_blocked,omp_blocked4`
+- **File risultati:** `results/raw/threads_20261115_184752.csv`; grafico
+  `results/plots/speedup_5_euclidean_mnist_60000_384_784.png` (rigenerabile).
+- **Risultato** (mediana; seq = 19.08 s = 2.84 GFLOP/s; 54.2 GFLOP totali):
+
+  | variante     | 1 thr  | 6 thr  | 8 thr  | 12 thr | speedup max vs seq | GFLOP/s max |
+  |--------------|--------|--------|--------|--------|--------------------|-------------|
+  | omp_naive    | 19.03 s| 3.10 s | 2.29 s | 2.74 s | 8.3× (8 thr)       | 23.7        |
+  | omp_simd     | 6.62 s | 0.91 s | 0.73 s | 2.88 s | 26.3× (8 thr)      | 74.7        |
+  | omp_soa      | 5.61 s | 1.80 s | 1.43 s | 2.90 s | 13.4× (8 thr)      | 38.0        |
+  | omp_aosoa    | 4.89 s | 0.95 s | 0.75 s | 3.26 s | 25.3× (8 thr)      | 71.9        |
+  | omp_blocked  | 2.05 s | 0.45 s | 0.36 s | 0.27 s | 70.1× (12 thr)     | 199         |
+  | omp_blocked4 | 0.89 s | 0.28 s | 0.24 s | 0.17 s | **111× (12 thr)**  | **317**     |
+
+  0 mismatch ovunque. CPU / wall ≈ numero di thread in tutti i casi (anche i core in
+  stallo sulla memoria contano come occupati).
+- **Interpretazione:**
+  1. **Crollo a 12 thread delle varianti senza blocking.** Banda "apparente"
+     (384 × 188 MB = 72.2 GB letti) a 12 thread: naive 26.4, simd 25.1, soa 24.9, aosoa
+     22.2 GB/s → tutte convergono al **picco DRAM single channel (23.5 GB/s)**. A 8
+     thread omp_simd ha banda apparente 99.6 GB/s = 4.2× il picco: i thread scorrono il
+     training quasi in sincronia e si condividono le righe in L3. Ipotesi: con 12 thread
+     (2 per core) la sincronia si rompe e/o la L3 per thread si dimezza (12 MB / 12) →
+     ogni thread rilegge dalla DRAM. Conferma indiretta dallo sweep di scheduling: omp_simd
+     con `dynamic,64` (solo 6 chunk → 6 thread attivi) impiega 0.90 s contro 2.75 s di
+     `static` a 12 thread: **meno thread = più veloce**.
+  2. **Efficienza > 1 di omp_simd (1.2) e omp_naive (1.09).** Per omp_simd: con 1 thread
+     la banda è limitata da un singolo core (72.2 GB / 6.62 s = 10.9 GB/s); con più thread
+     le righe condivise in L3 aumentano la banda effettiva per thread → superlineare.
+     Per omp_naive (compute-bound) la causa non è chiara: domanda aperta.
+  3. **Hyperthreading:** aiuta le varianti *latency-bound* in cache: omp_blocked
+     6 → 12 thread = 1.65× (un solo accumulatore FMA per thread: il secondo thread del
+     core riempie gli slot vuoti della pipeline). Danneggia le varianti memory-bound
+     (punto 1). Risposta alla domanda aperta del CLAUDE.md: dipende dal collo di bottiglia.
+  4. **omp_blocked4: plateau 4-6 thread, poi di nuovo memory-bound.** Con 1 thread fa
+     60.8 GFLOP/s (2.3× omp_blocked, 21× seq): il micro-kernel 4×1 rompe il limite di
+     latenza. Ma il traffico DRAM è 24 blocchi × 188 MB = 4.5 GB: a 6 thread 16.4 GB/s
+     (70% del picco), a 12 thread 26.4 GB/s (≈ picco). **Roofline:** con QB=16 ogni
+     float letto dalla DRAM (4 B) serve 16 query × 3 flop = 12 flop/B → tetto
+     23.5 GB/s × 12 = 282 GFLOP/s; misurato 317 a 12 thread (un po' sopra grazie alla
+     L3). omp_blocked (199 GFLOP/s) resta sotto il tetto: è compute-bound.
+     → per blocked4 serve più riuso (QB maggiore), ma meno blocchi = peggior
+     bilanciamento: compromesso granularità/riuso da misurare con lo sweep tiles.
+
+## 2026-11-15 — Scheduling a 12 thread (valido)
+- **Comando:** `python3 scripts/run_benchmarks.py schedule --variants omp_naive,omp_simd,omp_blocked,omp_blocked4 --threads 12 --no-seq`
+- **File risultati:** `results/raw/schedule_20261115_185923.csv`
+- **Risultato** (mediana, s):
+
+  | schedule   | naive | simd  | blocked | blocked4 |
+  |------------|-------|-------|---------|----------|
+  | static     | 2.66  | 2.75  | 0.279   | 0.170    |
+  | static,1   | 2.82  | 2.83  | 0.277   | 0.171    |
+  | static,16  | 2.93  | 2.78  | 1.405   | 0.609    |
+  | dynamic,1  | 2.70  | 3.09  | 0.279   | 0.172    |
+  | dynamic,16 | 2.90  | 2.92  | 1.393   | 0.620    |
+  | dynamic,64 | 3.04  | 0.90  | 2.055   | 0.870    |
+  | guided     | 2.62  | 2.85  | 0.270   | 0.164    |
+
+- **Interpretazione:** il carico per query è uniforme (stessa quantità di lavoro per
+  ogni query), quindi `static` è già bilanciato: per naive e simd tutti gli schedule
+  sono entro il rumore (std 0.1-0.37 s), tranne il caso simd/dynamic,64 spiegato sopra.
+  Per le varianti a blocchi il chunk conta in **blocchi da 16 query**, non in query:
+  con 24 blocchi, chunk 16 → 2 chunk → 2 thread al lavoro (CPU/wall = 1.5, tempo ×5);
+  chunk 64 → 1 chunk → 1 thread (tempo = quello a 1 thread). Lezione: la granularità
+  dello schedule va ragionata sull'unità di lavoro del loop parallelo.
+
+## 2026-11-15 — Accuratezza sull'intero test set (10000 query, valido)
+- **Comando:** fine di `run_all.sh` (omp_blocked4, 12 thread, 1 run, senza validazione:
+  la variante ha dato 0 mismatch in tutte le configurazioni validate).
+- **File:** `results/raw/accuracy_full_20261115_193504.csv` (tempi NON validi: batteria).
+
+  | k  | euclidea | coseno |
+  |----|----------|--------|
+  | 1  | 96.91%   | 97.23% |
+  | 5  | 96.93%   | 97.37% |
+  | 10 | 96.83%   | 97.24% |
+
+  Il coseno è ~0.4 punti migliore: normalizza l'intensità complessiva dell'immagine
+  (tratti più spessi/sottili della stessa cifra). k=5 è il migliore per entrambe.
+
+- **Da rifare in carica:** tiles (6 e 12 thread), cachefit, vec, kmetric (tempi).
 
 ---

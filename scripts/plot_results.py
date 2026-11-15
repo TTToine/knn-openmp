@@ -81,7 +81,7 @@ def main(paths):
                    "speedup", "scalability", "efficiency", "accuracy", "mismatches"]
     print(agg[cols].to_string(index=False, float_format=lambda x: f"{x:.3f}"))
 
-    is_tile = agg.tag.astype(str).str.contains(TILE_TAG)
+    is_tile = agg.tag.astype(str).str.fullmatch(r"tb\d+_qb\d+")
     for cfg, gc in agg[(agg.variant != "seq") & ~is_tile].groupby(CFG):
         label = "_".join(str(c) for c in cfg if c != "")
         title = f"n_train={cfg[4]}, n_test={cfg[5]}, k={cfg[1]}, {cfg[2]}" + (f" [{cfg[0]}]" if cfg[0] else "")
