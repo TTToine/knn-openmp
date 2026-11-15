@@ -439,4 +439,39 @@ training sono 72.3 GB per run.
   diario le spiegazioni alternative e l'esperimento breve che le discrimina; domani
   `run_rest.sh` + `report/predictions_vs_measured.md`.
 
+## 2026-11-16 — Errata alle voci precedenti (dalla revisione, `report/review.md`)
+Le voci sopra restano com'erano scritte; queste correzioni prevalgono.
+
+1. **Voce `omp_blocked`, nota (*) su `omp_simd` a 6 thread con 192 query
+   (15.8 GFLOP/s "anomalo").** Non è anomalo: il tetto memory-bound di `omp_simd` è
+   23.5 GB/s ÷ 4 B × 3 flop = 17.6 GFLOP/s, quindi 15.8 è il 90% della banda DRAM
+   (regime "flussi indipendenti"). Eccezionale è la misura con 100 query
+   (38.7 GFLOP/s = 2.2× il tetto): lì i thread si condividono le righe in L3
+   (regime "convoglio"). Il rapporto blocked/simd "6.5×" di quella tabella confronta
+   quindi `omp_blocked` con `omp_simd` nel suo regime lento: nella campagna valida,
+   a 6 thread, il rapporto è 0.914 / 0.449 = 2.0×.
+2. **Voce cache-fit: "DRAM ≈ 9.6 GB/s" a 1 thread.** È il limite di *un core*, non
+   della DRAM: ~10–12 miss in volo (line fill buffer) × 64 B / ~70 ns ≈ 9–11 GB/s
+   (legge di Little). In convoglio ogni thread arriva a ~13 GB/s.
+3. **Voce variance probe: "39.9 GFLOP/s, coerente…" e "3 o 6 core danno lo stesso
+   tempo".** La campagna ufficiale, 4 minuti dopo, misura la stessa configurazione a
+   0.914 s (59.3 GFLOP/s) contro 1.35 s del probe. Differenza non spiegata: la
+   conclusione sul binding è **sospesa** finché il probe non viene rifatto nel
+   blocco di misure.
+4. **Voce `omp_blocked`: "il limite torna a essere il calcolo"; voce strong
+   scaling, punto 4: "`omp_blocked` resta sotto il tetto: è compute-bound".** Il
+   blocking riduce il traffico DRAM di QB volte, non lo elimina: a 1 thread la
+   lettura dalla DRAM vale ≈ 20% del tempo di `omp_blocked` e ≈ 50% di quello di
+   `omp_blocked4` (4.52 GB a ~10–11 GB/s ≈ 0.41–0.47 s su 2.05 e 0.89 s). E il
+   "tetto" di 282 GFLOP/s è stato superato (317): assumeva che ogni blocco leggesse
+   la sua copia dalla DRAM, ma anche le tile vengono condivise in L3.
+5. **Voce accuratezza: "k=5 è il migliore".** Le differenze tra k (2–10 immagini su
+   10000) sono dentro l'incertezza statistica (±0.17 punti): i tre k sono
+   indistinguibili. Il vantaggio del coseno (30–44 immagini) è più solido; la sua
+   spiegazione resta un'ipotesi.
+6. **Modello a latenza (voce cache-fit):** le frequenze usate (4.5 GHz) non sono mai
+   state misurate e i dati a 1 thread non sono coerenti tra loro (`omp_naive` ⇒
+   3.8 GHz, `omp_blocked` ⇒ ≥ 4.4 GHz con lo stesso modello). Da rifare con una
+   sonda di frequenza (review §1-E).
+
 ---
