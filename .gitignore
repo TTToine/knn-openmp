@@ -1,0 +1,9 @@
+build*/
+data/
+.cache/
+results/plots/
+__pycache__/
+*.o
+.vscode/
+.idea/
+.claude/settings.local.json
