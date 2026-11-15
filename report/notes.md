@@ -56,3 +56,43 @@ Formato suggerito (una voce per esperimento):
   training dalla cache.
 
 ---
+
+## 2026-11-15 — omp_simd è memory-bound? Training in L2 / L3 / DRAM
+- **Ipotesi:** se il guadagno SIMD su MNIST completo (2.9×) è limitato dalla banda di
+  memoria, riducendo il training finché sta in cache il guadagno deve salire verso 8×.
+  omp_naive invece dovrebbe avere GFLOP/s quasi costanti (limitato dalla catena di `add`).
+- **Configurazione:** commit `191293f`, `OMP_SCHEDULE=static`, k=5, euclidea, 3 run + 1
+  warm-up. Righe MNIST = 3136 B. Casi: 64 train × 10000 test (200 KB, sta in L2 256 KB),
+  2000 × 2000 (6.3 MB, sta in L3 12 MB), 60000 × 100 (188 MB, DRAM).
+- **Comando:** `bash scripts/cachefit.sh`
+- **File risultati:** `results/raw/cachefit_20261115_180257.csv`
+- **Risultato** (mediana; GFLOP/s con 3 flop/elemento):
+
+  | training     | thr | naive GFLOP/s | simd GFLOP/s | simd/naive |
+  |--------------|-----|---------------|--------------|------------|
+  | 64 (L2)      | 1   | 2.9           | 20.8         | **7.2×**   |
+  | 2000 (L3)    | 1   | 2.6           | 12.9         | **5.0×**   |
+  | 60000 (DRAM) | 1   | 2.5           | 7.2          | **2.8×**   |
+  | 64 (L2)      | 6   | 17.5          | 109          | 6.2×       |
+  | 2000 (L3)    | 6   | 16.6          | 80.7         | 4.9×       |
+  | 60000 (DRAM) | 6   | 15.4          | 30.4         | 2.0× (*)   |
+
+  (*) misura rumorosa: simd 6 thr std 0.41 s, min 0.35 / max 1.10 s (nella prova
+  precedente 0.36 s). Anche naive DRAM 1 thr è ~10% più lento della prova precedente
+  (5.55 vs 5.05 s): probabile variazione di frequenza/termica. Da ripetere con più run e
+  portatile in condizioni controllate. 0 mismatch in tutti i casi.
+- **Interpretazione:** ipotesi confermata. Con 1 thread il guadagno SIMD cala
+  7.2× → 5.0× → 2.8× man mano che i dati escono da L2, poi da L3. omp_naive ha
+  GFLOP/s quasi costanti (2.5-2.9) indipendentemente da dove stanno i dati → è
+  **compute-bound**; omp_simd su MNIST completo è **memory-bound**.
+  Banda implicita omp_simd 1 thread: L3 ≈ 17 GB/s, DRAM ≈ 9.6 GB/s.
+  Modello a latenza (da verificare): naive fa 8 `vaddss` dipendenti per 8 elementi,
+  latenza ~4 cicli → ~0.25 elementi/ciclo ≈ 3.4 GFLOP/s a ~4.5 GHz (misurato 2.9).
+  simd ha un solo accumulatore vettoriale → 1 `vfmadd231ps` ogni ~4 cicli → ~2
+  elementi/ciclo ≈ 27 GFLOP/s (misurato 20.8 in L2). Quindi anche in L2 simd è limitato
+  dalla latenza dell'FMA, non dal throughput (2 FMA/ciclo possibili).
+- **Prossimo passo:** il blocking (roadmap 4) attacca proprio il limite di memoria:
+  riusare ogni tile di training per più query mentre è in cache. Più accumulatori
+  indipendenti (unrolling della riduzione) attaccherebbero il limite di latenza in L2.
+
+---
