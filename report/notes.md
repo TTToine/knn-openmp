@@ -349,3 +349,94 @@ Formato suggerito (una voce per esperimento):
 - **Da rifare in carica:** tiles (6 e 12 thread), cachefit, vec, kmetric (tempi).
 
 ---
+
+## 2026-11-16 — Chiusura della fase A: rilettura dei soli dati validi
+Nessuna misura nuova: solo controllo di integrità, grafici e rilettura critica di
+`threads_20261115_184752.csv` e `schedule_20261115_185923.csv` (commit dei binari:
+`c33260f`; da allora i sorgenti non sono cambiati, verificato con `git diff`).
+I numeri di `PREVISIONI_run_rest.md` sez. 3 **non** compaiono qui: sono previsioni.
+
+- **Integrità (verificata):** campagna terminata (`### done` nel log, nessun exit
+  code ≠ 0); 5 run + 1 warm-up per ognuna delle 37 + 28 configurazioni; 0 mismatch
+  ovunque; `_system.txt` presente per entrambi i CSV; 384 query = 24 blocchi da 16
+  (divisibile per 1, 2, 4, 6, 8, 12); `seq` = 19.08 s (≥ 10 s). `ctest` verde su HEAD.
+  **Mancano** (oltre agli esperimenti a batteria da rifare): `sizes` (curve di speedup
+  per più dimensioni dell'input: richiesto dalla traccia, non è né in `run_all.sh` né
+  in `run_rest.sh`), il confronto top-k e il weak scaling.
+- **Grafici:** `plot_results.py` sistemato (solo presentazione): asse log per lo
+  speedup (le varianti coprono 1×–110×), barre d'errore = run più veloce / più lento
+  attorno alla mediana (prima: ± std, gonfiata da un solo outlier), scheduling in un
+  pannello per variante con gli schedule nello stesso ordine (prima le etichette si
+  sovrapponevano ed erano illeggibili). I due CSV vanno passati **separatamente**
+  allo script: insieme, le righe `static` a 12 thread dei due file verrebbero fuse in
+  un'unica configurazione da 10 run. Riepiloghi: `results/plots/summary_threads.csv`,
+  `summary_schedule.csv` (rigenerabili, non committati).
+
+### Osservazioni (dati validi)
+Riferimenti: 54.2 GFLOP per run; training 188.2 MB; se ogni query rilegge tutto il
+training sono 72.3 GB per run.
+
+1. **Due regimi per le varianti senza blocking: "convoglio" e "flussi indipendenti".**
+   Velocità di scorrimento *per thread* di `omp_simd` (GB di training letti da ogni
+   thread al secondo = 72.3 GB / (p · T_p)):
+
+   | thread | 1 | 2 | 4 | 6 | 8 | 12 |
+   |---|---|---|---|---|---|---|
+   | GB/s per thread | 10.9 | 13.6 | 13.3 | 13.2 | 12.5 | **2.1** |
+   | GB/s apparenti totali | 10.9 | 27.2 | 53.2 | 79.0 | **99.6** | 25.1 |
+
+   Da 2 a 8 thread ogni thread scorre il training alla *stessa* velocità (~13 GB/s)
+   qualunque sia il numero di thread, e il totale apparente arriva a 4.2× il picco
+   teorico della DRAM (23.5 GB/s, single channel): i thread non leggono 8 copie
+   dalla DRAM, leggono **la stessa** riga quasi nello stesso momento — il primo la
+   porta in L3, gli altri la trovano lì. A 12 thread il totale di *tutte e quattro*
+   le varianti (naive 26.3, simd 25.1, soa 24.9, aosoa 22.1 GB/s) coincide col picco
+   DRAM: ogni thread legge per conto suo. Conseguenza per il report: lo "scaling
+   quasi ideale" di `omp_simd` fino a 8 thread **non** dice che la banda di memoria
+   scala; dice che con `schedule(static)` e query che scorrono lo stesso training
+   nello stesso ordine il traffico DRAM non cresce col numero di thread (un blocking
+   "nel tempo" involontario). *Ipotesi da verificare* sul perché si rompa a 12:
+   vedi `report/review.md` §1.
+2. **Controprova nello sweep di scheduling.** `omp_simd`, 12 thread, `dynamic,64`:
+   0.90 s contro 2.75–3.09 s di tutti gli altri schedule. 384 query / 64 = 6 chunk →
+   lavorano solo 6 thread (CPU/wall = 6.0) e il tempo torna quello a 6 thread
+   (0.914 s). Stessa cosa per `omp_naive` (`dynamic,64`: CPU/wall = 5.9, 3.04 s ≈
+   3.10 s a 6 thread). Meno thread attivi = stesso tempo o migliore.
+3. **Granularità delle varianti a blocchi.** Il loop parallelo è su 24 blocchi da 16
+   query, quindi il chunk si conta in blocchi: `static,16`/`dynamic,16` → 2 chunk →
+   2 thread al lavoro (CPU/wall = 1.5; `omp_blocked` 1.40 s contro 1.08 s a 2 thread
+   veri: i 2 chunk sono sbilanciati, 16 + 8 blocchi); `dynamic,64` → 1 chunk → 1
+   thread (2.055 s = tempo a 1 thread, 2.046 s). Non è un effetto dello scheduling ma
+   della granularità: per queste varianti lo sweep sensato è con chunk 1–4.
+4. **`omp_blocked4`: dopo 4 thread smette di scalare.** Mediane 0.270 s (4 thr) e
+   0.275 s (6 thr); ma le 5 misure sono rumorose (4 thr: 0.259–0.351; 6 thr:
+   0.231–0.290), quindi "plateau" è corretto solo entro ±15%. Traffico DRAM se ogni
+   blocco rilegge il training: 24 × 188 MB = 4.52 GB → 16.7 GB/s a 4 thread, 16.4 a
+   6 (≈ 70% del picco teorico). Curioso: `omp_blocked` a 12 thread fa 16.6 GB/s, lo
+   stesso valore. *Ipotesi:* ~16.5 GB/s è la banda DRAM realmente sostenibile su
+   questa macchina (va misurata con un test STREAM-like); allora `omp_blocked4` è
+   memory-bound da 4 thread **e `omp_blocked` a 12 thread potrebbe esserlo anche
+   lui** (il diario lo dava per compute-bound). A 12 thread `omp_blocked4` fa
+   26.4 GB/s apparenti (sopra il picco): di nuovo righe condivise in L3 (regime 1).
+   Lo sweep `tiles` con QB=32 (traffico DRAM dimezzato) discrimina.
+5. **Tetto di calcolo.** sub + FMA = 2 µop vettoriali per 8 elementi; con 2 porte FP
+   (p0, p1) sono 8 elementi × 3 flop per ciclo = 24 flop/ciclo/core. Con l'ipotesi
+   (non misurata!) di ~3.8 GHz sotto carico su 6 core: ≈ 550 GFLOP/s.
+   `omp_blocked4` a 12 thread fa 317 GFLOP/s ≈ 58% di questo tetto. Assembly
+   controllato (`objdump`, build `c33260f`): `omp_blocked4` ha 4 accumulatori
+   `ymm8–11`, nessuno spill, 5 load + 4 `vsubps` + 4 `vfmadd231ps` per iterazione;
+   `omp_simd`/`omp_blocked` 1 accumulatore; `omp_soa`/`omp_aosoa` 8 accumulatori.
+6. **Accuratezza.** 1-NN euclidea sul test set completo = 96.91%, cioè errore 3.09%:
+   coincide con il valore riportato per k-NN L2 su MNIST nella tabella di LeCun.
+   Coseno sempre migliore di 0.3–0.4 punti (k=5: 97.37% contro 96.93%).
+7. **Rumore.** `omp_simd` a 1 thread: 6.71, 6.77, 6.62, 5.77, 5.24 s nello stesso
+   processo — non rumore casuale ma una deriva verso il veloce (−22%). La mediana
+   (6.62 s) è il valore "lento": l'efficienza > 1 (1.2) di `omp_simd` dipende da quale
+   T(1) si prende (con 5.24 s sarebbe 0.96). `seq`: primo run 20.85 s, poi
+   18.9–19.1 (un solo warm-up non basta al primo esperimento della campagna).
+
+- **Prossimo passo:** `report/review.md` (fase B) elenca per ogni conclusione del
+  diario le spiegazioni alternative e l'esperimento breve che le discrimina; domani
+  `run_rest.sh` + `report/predictions_vs_measured.md`.
+
+---

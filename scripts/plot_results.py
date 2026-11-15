@@ -29,6 +29,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -95,15 +96,23 @@ def main(paths):
             a2.plot([1, tmax], [1, tmax], "k--", lw=1, label="ideal")
             for v, gv in gs.groupby("variant"):
                 gv = gv.sort_values("threads")
-                rel = gv["std"].fillna(0) / gv["median"]   # first-order error propagation
-                a1.errorbar(gv.threads, gv.speedup, yerr=gv.speedup * rel, marker="o", capsize=3, label=v)
-                a2.errorbar(gv.threads, gv.scalability, yerr=gv.scalability * rel, marker="o", capsize=3, label=v)
+                # Error bars = fastest and slowest run (T_x / T_max .. T_x / T_min around
+                # the median): with 5 runs and sporadic outliers the range is more
+                # honest than a std, which one slow run inflates symmetrically.
+                rel = [1 - gv["median"] / gv["max"], gv["median"] / gv["min"] - 1]
+                a1.errorbar(gv.threads, gv.speedup, yerr=[gv.speedup * r for r in rel],
+                            marker="o", capsize=3, label=v)
+                a2.errorbar(gv.threads, gv.scalability, yerr=[gv.scalability * r for r in rel],
+                            marker="o", capsize=3, label=v)
                 a3.plot(gv.threads, gv.efficiency, marker="o", label=v)
             for a in (a1, a2, a3):
                 a.axvline(6, color="grey", lw=0.8, ls=":")   # physical cores
-                a.grid(alpha=0.3); a.set_xticks(sorted(gs.threads.unique())); a.set_xlabel("threads")
-            a1.text(6.1, a1.get_ylim()[0], "6 physical cores", color="grey", fontsize=8, va="bottom")
-            a1.set(ylabel="T_seq / T_p", title=f"Speedup vs seq ({sched})")
+                a.grid(alpha=0.3, which="both"); a.set_xticks(sorted(gs.threads.unique())); a.set_xlabel("threads")
+            # log axis: the variants span two orders of magnitude (1x .. 110x)
+            a1.set_yscale("log")
+            a1.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%g"))
+            a3.text(6.15, 0.02, "6 physical cores", color="grey", fontsize=8, va="bottom")
+            a1.set(ylabel="T_seq / T_p (log scale)", title=f"Speedup vs seq ({sched}), bars = min-max")
             a2.set(ylabel="T_1 / T_p", title="Scalability (same variant)")
             top = max(1.15, float(gs.efficiency.max()) + 0.05)
             a3.set(ylabel="scalability / p", title="Efficiency", ylim=(0, top))
@@ -117,13 +126,20 @@ def main(paths):
 
         # time per schedule
         if gc.schedule.nunique() > 1:
-            fig, ax = plt.subplots(figsize=(10, 4))
-            for v, gv in gc.groupby("variant"):
-                gv = gv.sort_values("median")
-                ax.bar([f"{s}\n{v}" for s in gv.schedule], gv["median"], yerr=gv["std"].fillna(0), capsize=3)
-            ax.set(ylabel="median time [s]", title=f"Scheduling - {title}")
-            ax.grid(axis="y", alpha=0.3)
-            plt.setp(ax.get_xticklabels(), fontsize=7)
+            # One panel per variant (own y scale: the variants differ by 15x), schedules
+            # in the same order everywhere so the panels can be compared by eye.
+            order = list(dict.fromkeys(df.schedule[df.schedule != "none"]))   # order of execution
+            names = sorted(gc.variant.unique())
+            fig, axes = plt.subplots(1, len(names), figsize=(3.6 * len(names), 4), squeeze=False)
+            for ax, v in zip(axes[0], names):
+                gv = gc[gc.variant == v].set_index("schedule").reindex(order).dropna(subset=["median"])
+                err = [gv["median"] - gv["min"], gv["max"] - gv["median"]]
+                ax.bar(gv.index, gv["median"], yerr=err, capsize=3, color="tab:blue")
+                ax.set_title(f"{v}, {int(gv.threads.iloc[0])} threads", fontsize=10)
+                ax.grid(axis="y", alpha=0.3)
+                ax.tick_params(axis="x", labelrotation=60, labelsize=8)
+            axes[0][0].set_ylabel("median time [s], bars = min-max")
+            fig.suptitle(f"Scheduling (OMP_SCHEDULE kind-chunk) - {title}")
             fig.tight_layout()
             fig.savefig(OUT / f"schedule_{label}.png", dpi=150)
             plt.close(fig)
