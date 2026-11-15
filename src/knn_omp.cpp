@@ -39,9 +39,59 @@ void knn_omp_naive(const Dataset& train, const Dataset& test,
     }
 }
 
+// v2 - explicit SIMD on the distance loop (otherwise identical to v1).
+// Without -ffast-math GCC must keep the scalar summation order, so the
+// reductions in knn_common.hpp stay scalar (one dependent add chain).
+// `omp simd reduction(+:s)` gives the compiler permission to keep one partial
+// sum per SIMD lane (8 floats with AVX2) and combine them at the end.
+// The summation order changes -> results may differ in the last bits.
+static inline float sq_euclidean_simd(const float* a, const float* b, std::size_t d) {
+    float s = 0.0f;
+#pragma omp simd reduction(+:s)
+    for (std::size_t i = 0; i < d; ++i) {
+        const float t = a[i] - b[i];
+        s += t * t;
+    }
+    return s;
+}
+
+static inline float dot_simd(const float* a, const float* b, std::size_t d) {
+    float s = 0.0f;
+#pragma omp simd reduction(+:s)
+    for (std::size_t i = 0; i < d; ++i) s += a[i] * b[i];
+    return s;
+}
+
+void knn_omp_simd(const Dataset& train, const Dataset& test,
+                  const KnnParams& params, std::uint8_t* out) {
+    const std::size_t d = train.d;
+
+    std::vector<float> train_norm, test_norm;
+    if (params.metric == Metric::Cosine) {
+        train_norm.resize(train.n);
+        test_norm.resize(test.n);
+        row_norms(train, train_norm.data());   // same (scalar) norms as v1
+        row_norms(test, test_norm.data());
+    }
+
+    const long n_test = static_cast<long>(test.n);
+#pragma omp parallel for schedule(runtime)
+    for (long i = 0; i < n_test; ++i) {
+        const float* q = test.row(i);
+        TopK top(params.k);
+        for (std::size_t j = 0; j < train.n; ++j) {
+            const float* t = train.row(j);
+            const float dist = (params.metric == Metric::Euclidean)
+                                   ? sq_euclidean_simd(q, t, d)
+                                   : cosine_distance(dot_simd(q, t, d), test_norm[i], train_norm[j]);
+            top.push(dist, train.y[j]);
+        }
+        out[i] = top.vote();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Next variants (see the roadmap in CLAUDE.md). Suggested names:
-//   knn_omp_simd      - #pragma omp simd reduction on the distance loop
 //   knn_omp_blocked   - tile test x train to reuse train rows from cache
 //   knn_omp_gemm      - |a|^2 + |b|^2 - 2 a.b with a blocked matrix product
 // ---------------------------------------------------------------------------

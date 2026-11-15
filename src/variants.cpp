@@ -8,6 +8,7 @@ const std::vector<Variant>& all_variants() {
     static const std::vector<Variant> v = {
         {"seq", "sequential reference (oracle + baseline)", knn_sequential, false},
         {"omp_naive", "parallel for over test samples, schedule(runtime)", knn_omp_naive, true},
+        {"omp_simd", "omp_naive + omp simd reduction on the distance loop", knn_omp_simd, true},
     };
     return v;
 }

@@ -30,6 +30,11 @@ void knn_sequential(const Dataset& train, const Dataset& test,
 void knn_omp_naive(const Dataset& train, const Dataset& test,
                    const KnnParams& params, std::uint8_t* out);
 
+// Same as omp_naive, plus `#pragma omp simd reduction` on the distance loop.
+// Reorders the float sums: predictions may differ on near-exact ties.
+void knn_omp_simd(const Dataset& train, const Dataset& test,
+                  const KnnParams& params, std::uint8_t* out);
+
 // ---- Variant registry (see src/variants.cpp) ----
 struct Variant {
     std::string name;
