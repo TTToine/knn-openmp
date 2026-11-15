@@ -52,7 +52,23 @@ def rotated(items, i):
     return items[i:] + items[:i]
 
 
+def on_ac_power():
+    """True/False if WSL exposes the mains adapter (/sys/class/power_supply), else None.
+    On battery Windows lowers the CPU power limits: timings become 15%-2x slower."""
+    found = None
+    for ps in Path("/sys/class/power_supply").glob("*"):
+        try:
+            if (ps / "type").read_text().strip() == "Mains":
+                found = found or (ps / "online").read_text().strip() == "1"
+        except OSError:
+            pass
+    return found
+
+
 def run(binary, out_csv, variant, threads, schedule, args, extra, tag=None, env_extra=None):
+    if on_ac_power() is False and not args.allow_battery:
+        sys.exit("ABORT: laptop on battery - plug it in (or pass --allow-battery). "
+                 f"Results so far are in {out_csv}")
     tag = args.tag if tag is None else tag
     cmd = [str(binary), "--variant", variant, "--threads", str(threads),
            "--runs", str(args.runs), "--warmup", str(args.warmup),
@@ -99,6 +115,7 @@ def main():
     p.add_argument("--runs", type=int, default=5)
     p.add_argument("--warmup", type=int, default=1)
     p.add_argument("--no-seq", action="store_true", help="skip the sequential baseline run")
+    p.add_argument("--allow-battery", action="store_true", help="do not abort when on battery")
     args = p.parse_args()
 
     binary = ROOT / args.binary
