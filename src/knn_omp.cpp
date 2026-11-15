@@ -2,6 +2,8 @@
 // can compare them one against the other. Register new variants in variants.cpp.
 #include <omp.h>
 
+#include <algorithm>
+#include <cstdlib>
 #include <vector>
 
 #include "knn.hpp"
@@ -90,8 +92,69 @@ void knn_omp_simd(const Dataset& train, const Dataset& test,
     }
 }
 
+// v3 - cache blocking (tiling) on top of v2's SIMD kernel.
+// In v2 every query streams the whole training set (188 MB for MNIST) from
+// DRAM, so the kernel is memory-bound. Here each thread takes a block of QB
+// queries and walks the training set in tiles of TB rows: a tile is loaded
+// from DRAM once and then reused QB times from L2, cutting DRAM traffic by ~QB.
+// Every query still sees the training rows in increasing j, so TopK receives
+// the distances in the same order as in v1/v2 (same tie-breaking).
+// Tile sizes: KNN_TB / KNN_QB environment variables (defaults below).
+static std::size_t env_size(const char* name, std::size_t def) {
+    const char* s = std::getenv(name);
+    const long v = s ? std::atol(s) : 0;
+    return v > 0 ? static_cast<std::size_t>(v) : def;
+}
+
+void knn_omp_blocked(const Dataset& train, const Dataset& test,
+                     const KnnParams& params, std::uint8_t* out) {
+    const std::size_t d = train.d;
+    // 32 rows x 3136 B = 100 KB: fits in the 256 KB L2 even when the two
+    // hyperthreads of a core share it. One query row (3 KB) stays in L1.
+    const std::size_t TB = env_size("KNN_TB", 32);
+    const std::size_t QB = env_size("KNN_QB", 16);
+
+    std::vector<float> train_norm, test_norm;
+    if (params.metric == Metric::Cosine) {
+        train_norm.resize(train.n);
+        test_norm.resize(test.n);
+        row_norms(train, train_norm.data());   // same (scalar) norms as v1
+        row_norms(test, test_norm.data());
+    }
+
+    const long n_qblocks = static_cast<long>((test.n + QB - 1) / QB);
+#pragma omp parallel
+    {
+        // One TopK per query of the block, private to the thread (declared
+        // inside the parallel region). Allocated once per thread, not per block.
+        std::vector<TopK> tops(QB, TopK(params.k));
+
+#pragma omp for schedule(runtime)
+        for (long b = 0; b < n_qblocks; ++b) {
+            const std::size_t i0 = static_cast<std::size_t>(b) * QB;
+            const std::size_t i1 = std::min(i0 + QB, test.n);   // last block may be partial
+            for (std::size_t i = i0; i < i1; ++i) tops[i - i0] = TopK(params.k);
+
+            for (std::size_t j0 = 0; j0 < train.n; j0 += TB) {
+                const std::size_t j1 = std::min(j0 + TB, train.n);   // last tile may be partial
+                for (std::size_t i = i0; i < i1; ++i) {   // tile j0..j1 reused (i1-i0) times
+                    const float* q = test.row(i);
+                    TopK& top = tops[i - i0];
+                    for (std::size_t j = j0; j < j1; ++j) {
+                        const float* t = train.row(j);
+                        const float dist = (params.metric == Metric::Euclidean)
+                                               ? sq_euclidean_simd(q, t, d)
+                                               : cosine_distance(dot_simd(q, t, d), test_norm[i], train_norm[j]);
+                        top.push(dist, train.y[j]);
+                    }
+                }
+            }
+            for (std::size_t i = i0; i < i1; ++i) out[i] = tops[i - i0].vote();
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Next variants (see the roadmap in CLAUDE.md). Suggested names:
-//   knn_omp_blocked   - tile test x train to reuse train rows from cache
 //   knn_omp_gemm      - |a|^2 + |b|^2 - 2 a.b with a blocked matrix product
 // ---------------------------------------------------------------------------

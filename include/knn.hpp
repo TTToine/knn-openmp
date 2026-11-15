@@ -35,6 +35,11 @@ void knn_omp_naive(const Dataset& train, const Dataset& test,
 void knn_omp_simd(const Dataset& train, const Dataset& test,
                   const KnnParams& params, std::uint8_t* out);
 
+// omp_simd + cache blocking: blocks of QB queries x tiles of TB training rows,
+// so each tile is reused from L2. Tile sizes from KNN_QB / KNN_TB env vars.
+void knn_omp_blocked(const Dataset& train, const Dataset& test,
+                     const KnnParams& params, std::uint8_t* out);
+
 // ---- Variant registry (see src/variants.cpp) ----
 struct Variant {
     std::string name;

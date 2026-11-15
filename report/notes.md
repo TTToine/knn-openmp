@@ -135,3 +135,43 @@ Formato suggerito (una voce per esperimento):
   per superare il limite di latenza dell'FMA in L2.
 
 ---
+
+## 2026-11-15 — omp_blocked: cache blocking query × training
+- **Ipotesi:** omp_simd su MNIST completo è memory-bound (ogni query rilegge 188 MB).
+  Con blocchi di QB=16 query × tile di TB=32 righe di training (100 KB, sta in L2 anche
+  con 2 hyperthread per core) ogni tile viene letto dalla DRAM una volta e riusato 16
+  volte → traffico DRAM ÷16. Mi aspetto di tornare al regime "training in L2" misurato
+  nell'esperimento cache-fit: ~21 GFLOP/s con 1 thread, ~100 con 6.
+- **Correttezza:** ogni query vede ancora j crescente → stessa sequenza di `push` in
+  TopK, stessi pareggi. ctest passato (0 mismatch) con i default e anche con
+  `KNN_TB/KNN_QB` = 1/1, 7/5, 13/97, 100000/1000 (resti di blocco e tile).
+- **Configurazione:** commit `15b112c` + omp_blocked, `OMP_SCHEDULE=static`, MNIST 60000
+  train × 192 test (12 blocchi di query → 2 per thread a 6 thread), k=5, euclidea,
+  3 run + 1 warm-up, TB=32, QB=16.
+- **Comando:** `OMP_SCHEDULE=static ./build/knn --data data/mnist --n-test 192 --variant {omp_simd,omp_blocked} --threads {1,6} --runs 3 --warmup 1`
+- **File risultati:** nessuno (prova rapida, solo stdout).
+- **Risultato** (mediana; 27.1 GFLOP totali):
+
+  | variante    | thr | tempo   | GFLOP/s | blocked/simd |
+  |-------------|-----|---------|---------|--------------|
+  | omp_simd    | 1   | 3.857 s | 7.0     |              |
+  | omp_blocked | 1   | 1.267 s | 21.4    | **3.0×**     |
+  | omp_simd    | 6   | 1.717 s | 15.8 (*)|              |
+  | omp_blocked | 6   | 0.263 s | 103     | 6.5× (*)     |
+
+  (*) omp_simd a 6 thread è anomalo: std 0.30 s e solo 15.8 GFLOP/s contro i 38.7
+  misurati con 100 query. Possibile spiegazione: con 100 query i thread `static`
+  avanzano quasi in sincronia e si condividono le righe in L3; oppure rumore
+  termico/frequenza. Il rapporto 6.5× va confermato con misure controllate.
+  0 mismatch in tutti i casi.
+- **Interpretazione:** ipotesi confermata. omp_blocked raggiunge le stesse prestazioni
+  del caso "training in L2" (21.4 vs 20.8 GFLOP/s a 1 thread, 103 vs 109 a 6): il
+  blocking elimina il collo di bottiglia della memoria. Traffico DRAM stimato a 6 thread:
+  12 blocchi × 188 MB / 0.263 s ≈ 8.6 GB/s, ben sotto la banda disponibile → ora il
+  limite torna a essere il calcolo (latenza della FMA con un solo accumulatore).
+  Scalabilità 1→6 thread di omp_blocked: 4.8×.
+- **Prossimo passo:** (1) sweep di TB e QB (`KNN_TB`, `KNN_QB`) per vedere il ginocchio
+  quando il tile esce da L2; (2) misure controllate (portatile in carica) di
+  strong scaling 1-12 thread per naive/simd/blocked; (3) più accumulatori nel kernel.
+
+---
