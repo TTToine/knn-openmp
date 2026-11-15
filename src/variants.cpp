@@ -10,6 +10,9 @@ const std::vector<Variant>& all_variants() {
         {"omp_naive", "parallel for over test samples, schedule(runtime)", knn_omp_naive, true},
         {"omp_simd", "omp_naive + omp simd reduction on the distance loop", knn_omp_simd, true},
         {"omp_blocked", "omp_simd + query-block x train-tile cache blocking", knn_omp_blocked, true},
+        {"omp_soa", "omp_simd with feature-major (SoA) training set", knn_omp_soa, true},
+        {"omp_aosoa", "omp_soa with the training set in contiguous 64-sample blocks", knn_omp_aosoa, true},
+        {"omp_blocked4", "omp_blocked + 4 queries x 1 row micro-kernel", knn_omp_blocked4, true},
     };
     return v;
 }

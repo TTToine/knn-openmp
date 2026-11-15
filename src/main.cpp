@@ -4,6 +4,7 @@
 // validates its predictions against the sequential reference and appends one
 // CSV row per measured run. Only the classification call is timed (no I/O).
 #include <omp.h>
+#include <time.h>   // clock_gettime(CLOCK_PROCESS_CPUTIME_ID)
 
 #include <algorithm>
 #include <cmath>
@@ -158,6 +159,16 @@ double accuracy(const std::vector<std::uint8_t>& pred, const std::vector<std::ui
     return static_cast<double>(ok) / static_cast<double>(pred.size());
 }
 
+// CPU time consumed by ALL threads of the process (user + system), in seconds.
+// Wall-clock says how long we waited; CPU time says how much work the cores did:
+// CPU / wall = average number of busy cores (ideal = number of threads).
+// NB: OpenMP threads that spin-wait at barriers also accumulate CPU time.
+double process_cpu_seconds() {
+    timespec ts;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    return static_cast<double>(ts.tv_sec) + 1e-9 * static_cast<double>(ts.tv_nsec);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -198,12 +209,17 @@ int main(int argc, char** argv) {
 
     // ---- runs (only the knn call is timed) ----
     std::vector<std::uint8_t> pred(test.n);
-    std::vector<double> times;
+    std::vector<double> times, cpu_times;
     for (int r = 0; r < o.warmup + o.runs; ++r) {
+        const double c0 = process_cpu_seconds();
         const double t0 = omp_get_wtime();
         var->fn(train, test, o.params, pred.data());
         const double t1 = omp_get_wtime();
-        if (r >= o.warmup) times.push_back(t1 - t0);
+        const double c1 = process_cpu_seconds();
+        if (r >= o.warmup) {
+            times.push_back(t1 - t0);
+            cpu_times.push_back(c1 - c0);
+        }
     }
 
     // ---- validation against the sequential reference ----
@@ -238,21 +254,27 @@ int main(int argc, char** argv) {
     const double stddev = times.size() > 1 ? std::sqrt(var_acc / (times.size() - 1)) : 0.0;
     const double median = sorted[sorted.size() / 2];
 
-    std::printf("%-12s threads=%-3d median=%.4fs mean=%.4fs std=%.4fs min=%.4fs max=%.4fs acc=%.4f mismatches=%ld\n",
-                var->name.c_str(), threads, median, mean, stddev, sorted.front(), sorted.back(), acc, mismatches);
+    std::vector<double> cpu_sorted = cpu_times;
+    std::sort(cpu_sorted.begin(), cpu_sorted.end());
+    const double cpu_median = cpu_sorted[cpu_sorted.size() / 2];
+
+    std::printf("%-12s threads=%-3d median=%.4fs mean=%.4fs std=%.4fs min=%.4fs max=%.4fs cpu=%.4fs acc=%.4f mismatches=%ld\n",
+                var->name.c_str(), threads, median, mean, stddev, sorted.front(), sorted.back(),
+                cpu_median, acc, mismatches);
 
     if (!o.csv.empty()) {
         const bool new_file = !fs::exists(o.csv);
         if (fs::path(o.csv).has_parent_path()) fs::create_directories(fs::path(o.csv).parent_path());
         std::ofstream f(o.csv, std::ios::app);
+        // cpu_s is the last column so that older CSVs (without it) still line up.
         if (new_file)
-            f << "tag,variant,threads,schedule,k,metric,source,n_train,n_test,dim,replicate,run,time_s,accuracy,mismatches\n";
+            f << "tag,variant,threads,schedule,k,metric,source,n_train,n_test,dim,replicate,run,time_s,accuracy,mismatches,cpu_s\n";
         for (std::size_t r = 0; r < times.size(); ++r)
             f << o.tag << ',' << var->name << ',' << threads << ',' << sched << ','
               << o.params.k << ',' << metric_name(o.params.metric) << ','
               << (o.synthetic ? "synthetic" : "mnist") << ',' << train.n << ',' << test.n << ','
               << train.d << ',' << o.replicate << ',' << r << ',' << times[r] << ',' << acc << ','
-              << mismatches << '\n';
+              << mismatches << ',' << cpu_times[r] << '\n';
     }
     return valid ? 0 : 2;
 }

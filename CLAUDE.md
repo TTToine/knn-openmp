@@ -19,8 +19,15 @@ report/presentazione 20%, codice 10%. **L'analisi conta quanto il codice.**
 
 ## Ambiente
 - Laptop: Intel i7-10750H (6 core / 12 thread, AVX2, no AVX-512), 16 GB RAM.
-  Cache (verifica con `lscpu`): L1d 32 KB/core, L2 256 KB/core, L3 12 MB condivisa.
-- Windows 11 + **WSL2 Ubuntu**, GCC con OpenMP (non usare MSVC: supporta solo OpenMP 2.0).
+  Cache (verificata con `lscpu`): L1d 32 KB/core, L2 256 KB/core, L3 12 MB condivisa.
+  RAM: **un solo modulo** DDR4 16 GB (SK Hynix, ChannelB), 2933 MT/s → **single
+  channel, picco teorico ≈ 23.5 GB/s** (non 47: lo slot ChannelA è vuoto).
+- Windows 11 + **WSL2 Ubuntu**, GCC 15.2 con OpenMP 4.5 (non usare MSVC: solo OpenMP 2.0).
+- Repo: `~/knn-openmp` dentro WSL (`\\wsl.localhost\Ubuntu\home\antoine\knn-openmp`
+  da Windows), remote privato `github.com/TTToine/knn-openmp`. La copia in
+  `Downloads` è obsoleta.
+- Comandi da Windows: `wsl -e bash -c "cd ~/knn-openmp && ..."`; per comandi con
+  `$` o loop scrivi uno script e lancialo con `wsl -e bash script.sh` (quoting).
 
 ## Comandi
 ```bash
@@ -31,9 +38,15 @@ cmake -S . -B build-vecrep -DKNN_VEC_REPORT=ON && cmake --build build-vecrep 2>&
 bash scripts/download_mnist.sh                         # MNIST in data/mnist
 ./build/knn --list                                     # varianti registrate
 OMP_SCHEDULE=static ./build/knn --data data/mnist --n-test 500 --variant omp_naive --threads 6
-python3 scripts/run_benchmarks.py threads  --variants omp_naive        # strong scaling
+python3 scripts/run_benchmarks.py threads  --variants omp_naive,omp_simd   # strong scaling
 python3 scripts/run_benchmarks.py schedule --variants omp_naive --threads 12
+python3 scripts/run_benchmarks.py kmetric  --variants omp_blocked --threads 12
+python3 scripts/run_benchmarks.py tiles    --variants omp_blocked --threads 6  # KNN_TB x KNN_QB
+bash scripts/cachefit.sh ; bash scripts/novec.sh       # L2/L3/DRAM e vec vs novec
 python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici + summary
+# Metriche: speedup = T_seq/T_p (traccia); scalabilità = T_var(1)/T_var(p);
+# efficienza = scalabilità/p (NON speedup/p: con SIMD supererebbe 1).
+# --n-test 384 (default): 24 blocchi da 16 query, divisibile per 1,2,4,6,8,12 thread.
 ```
 
 ## Architettura
@@ -72,11 +85,16 @@ python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici
    Esperimenti: strong scaling 1-12 thread, confronto scheduling/chunk.
 2. [x] `omp_simd` — `#pragma omp simd reduction(+:s)` sul loop delle distanze;
    confronto con/senza vettorizzazione (`build-novec`), report di vettorizzazione.
-3. [ ] Layout dati AoS vs SoA — training set trasposto (feature-major): si vettorizza
+3. [x] `omp_soa` / `omp_aosoa` — training trasposto (feature-major): si vettorizza
    *su più campioni di training* invece che sulle dimensioni, senza riduzione
-   orizzontale e con lo stesso ordine di somma dello scalare.
-4. [ ] Blocking — tile di query × tile di training che restano in L2 (una riga MNIST
-   = 3136 B, ~80 righe in 256 KB): misura l'effetto sulla cache.
+   orizzontale e con lo stesso ordine di somma dello scalare. SoA puro = 784 flussi
+   a stride 240 KB (prefetcher/TLB) → perde su MNIST completo; AoSoA = blocchi
+   contigui [784][64]. Prossimo: AoSoA + blocking (il kernel SoA è il più veloce in L2).
+4. [x] `omp_blocked` — tile di query × tile di training che restano in L2 (una riga
+   MNIST = 3136 B, ~80 righe in 256 KB): misura l'effetto sulla cache; sweep TB × QB
+   (`run_benchmarks.py tiles`).
+4b. [x] `omp_blocked4` — micro-kernel 4 query × 1 riga di training (register blocking:
+   ogni riga caricata riusata 4 volte, 4 accumulatori indipendenti). Ponte verso il 5.
 5. [ ] Formulazione matriciale — |a|² + |b|² − 2 a·b con prodotto a blocchi;
    attenzione alla cancellazione numerica.
 6. [ ] Top-k: insertion sort vs heap al crescere di k.

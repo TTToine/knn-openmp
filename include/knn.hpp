@@ -40,6 +40,20 @@ void knn_omp_simd(const Dataset& train, const Dataset& test,
 void knn_omp_blocked(const Dataset& train, const Dataset& test,
                      const KnnParams& params, std::uint8_t* out);
 
+// omp_simd with the training set transposed to feature-major (SoA): vectorizes
+// over 64 training samples instead of over the features. Transpose is timed.
+void knn_omp_soa(const Dataset& train, const Dataset& test,
+                 const KnnParams& params, std::uint8_t* out);
+
+// Same as omp_soa but the transposed training set is stored in contiguous
+// blocks of 64 samples ([d][64] each, "AoSoA"): sequential, prefetch-friendly.
+void knn_omp_aosoa(const Dataset& train, const Dataset& test,
+                   const KnnParams& params, std::uint8_t* out);
+
+// omp_blocked + 4 queries x 1 training row micro-kernel (register blocking).
+void knn_omp_blocked4(const Dataset& train, const Dataset& test,
+                      const KnnParams& params, std::uint8_t* out);
+
 // ---- Variant registry (see src/variants.cpp) ----
 struct Variant {
     std::string name;
