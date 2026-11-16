@@ -474,4 +474,43 @@ Le voci sopra restano com'erano scritte; queste correzioni prevalgono.
    3.8 GHz, `omp_blocked` ⇒ ≥ 4.4 GHz con lo stesso modello). Da rifare con una
    sonda di frequenza (review §1-E).
 
+## 2026-11-16 — Modifiche dopo la revisione (nessuna misura)
+Concordate con lo studente: tutte le proposte di `review.md` §6 tranne la 9
+(`-ffp-contract=off` sul riferimento: non si fa, si dichiara nel report).
+
+- **Varianti nuove** (una idea ciascuna):
+  - `omp_blocked4_pn` — `omp_blocked4` con le norme del coseno calcolate da un
+    `parallel for` sulle righe. Idea: togliere la frazione seriale (Amdahl). Ogni
+    riga è ancora sommata da un solo thread nello stesso ordine.
+  - `omp_simd_stagger` — **diagnostica**, non un'ottimizzazione: `omp_simd` in cui il
+    thread t parte con t × `KNN_STAGGER_MS` (default 20) ms di ritardo, per rompere
+    di proposito la condivisione delle righe in L3. Sempre `static`. Il ritardo è
+    dentro il tempo misurato ((p−1) × 20 ms).
+- **Varianti esistenti**, senza cambiarne l'idea: `default(none)` con la lista
+  esplicita delle variabili condivise in tutte le regioni parallele;
+  `omp_soa`/`omp_aosoa` scrivono il tempo di allocazione + trasposta in
+  `knn_prep_seconds` → nuova colonna **`prep_s`** in fondo al CSV (`time_s` continua
+  a includerla). `omp_blocked4` è ora un involucro di `blocked4_impl(..., false)`.
+- **Il codice macchina dei kernel non è cambiato** (controllo fatto perché i dati
+  validi di ieri devono restare confrontabili con le misure di domani): confronto
+  `objdump` tra il binario della campagna e quello nuovo, per i corpi paralleli di
+  tutte e 6 le varianti. Stesso numero di istruzioni (aosoa: +3 nel prologo), stessa
+  identica sequenza di istruzioni `ymm`; le uniche differenze sono gli offset con
+  cui si leggono i campi della struttura delle variabili condivise (l'ordine della
+  clausola `shared` ne cambia la disposizione) — codice fuori dai loop.
+  `knn_sequential` è identico byte per byte.
+- **Strumenti:** `tools/hwprobe.cpp` (+ `scripts/hwprobe.sh`): frequenza reale sotto
+  carico (catena di `imul` da 3 cicli e di `vfmadd231ps` da 4 cicli, in assembly) e
+  banda DRAM in lettura (somma di 1 GB con 4 accumulatori), 1–12 thread.
+- **Script:** `run_benchmarks.py` con `--thread-list`, `--schedules`, `--n-trains`,
+  `--dim`; `run_rest.sh` con controllo di deriva anche **all'inizio**;
+  `run_extra.sh` = gli esperimenti della revisione (≈ 25 min + 15 di `sizes`);
+  `system_info.sh` registra alimentazione, piano energetico di Windows, THP, flag e
+  commit; `plot_roofline.py`.
+- **Test:** `smoke_test.sh` prova anche TB/QB dispari per tutte le varianti a
+  blocchi (prima solo a mano e solo per `omp_blocked`) e `k > n_train`. Passa con 0
+  mismatch (9 varianti). Validazione sull'intero test set: vedi `review.md` §4.1.
+- **Modello:** `report/perf_model.md` (fase C) con le previsioni P-1…P-6 registrate
+  prima delle misure di `run_extra.sh`.
+
 ---
