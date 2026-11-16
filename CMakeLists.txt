@@ -55,7 +55,17 @@ add_executable(hwprobe tools/hwprobe.cpp)
 target_link_libraries(hwprobe PRIVATE OpenMP::OpenMP_CXX)
 target_compile_options(hwprobe PRIVATE -O2 -mavx2 -mfma -Wall -Wextra)
 
+# Stand-alone experiment: synchronisation strategies on the confusion matrix
+# (critical / atomic / reduction / private counters with and without padding).
+# -O2: enough to keep the loops tight without changing what is being compared.
+add_executable(sync_strategies tools/sync_strategies.cpp)
+target_link_libraries(sync_strategies PRIVATE OpenMP::OpenMP_CXX)
+target_compile_options(sync_strategies PRIVATE -O2 -Wall -Wextra)
+
 # ---- tests --------------------------------------------------------------------
 enable_testing()
 add_test(NAME smoke
          COMMAND bash ${CMAKE_SOURCE_DIR}/tests/smoke_test.sh $<TARGET_FILE:knn>)
+# every strategy must produce the same matrix as the serial loop (small N, 4 threads)
+add_test(NAME sync_strategies COMMAND sync_strategies 200000 1)
+set_tests_properties(sync_strategies PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=4")

@@ -55,5 +55,18 @@ for variant in $("$KNN" --list | cut -f1); do
     fail=1
   fi
 done
+# Large k (up to kMaxK = 128): stresses the top-k policies (sorted array vs heap)
+# far beyond the k of the assignment. 20 dims + 10 classes = many near ties.
+for variant in $("$KNN" --list | cut -f1); do
+  for k in 32 128; do
+    for metric in euclidean cosine; do
+      if ! OMP_SCHEDULE=static "$KNN" --synthetic --n-train 700 --n-test 61 --dim 20 --variant "$variant" \
+           --metric "$metric" --k "$k" --threads 3 --runs 1 --warmup 0 --cache-dir "$CACHE" > /dev/null 2>&1; then
+        echo "FAIL: variant=$variant metric=$metric k=$k (large k)"
+        fail=1
+      fi
+    done
+  done
+done
 if [ "$fail" -eq 0 ]; then echo "all variants OK"; fi
 exit "$fail"

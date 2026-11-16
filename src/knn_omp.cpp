@@ -13,6 +13,7 @@
 
 #include "knn.hpp"
 #include "knn_common.hpp"
+#include "topk_heap.hpp"
 
 // v1 - parallel loop over test samples.
 // Each test sample is independent (embarrassingly parallel): no synchronisation
@@ -377,9 +378,12 @@ static void row_norms_parallel(const Dataset& ds, float* out) {
     }
 }
 
-// Body shared by omp_blocked4 and omp_blocked4_pn. `parallel_norms` is a
-// compile-time constant in both callers and the function is always inlined, so
-// omp_blocked4 compiles to the same code as before this helper existed.
+// Body shared by omp_blocked4, omp_blocked4_pn and omp_blocked4_heap.
+// `parallel_norms` is a compile-time constant in every caller, `Top` (the top-k
+// selection policy: TopK = sorted array, TopKHeap = binary heap) is a template
+// parameter, and the function is always inlined: omp_blocked4 compiles to the
+// same code as before this helper existed.
+template <class Top>
 [[gnu::always_inline]] static inline void blocked4_impl(const Dataset& train, const Dataset& test,
                                                         const KnnParams& params, std::uint8_t* out,
                                                         const bool parallel_norms) {
@@ -409,13 +413,13 @@ static void row_norms_parallel(const Dataset& ds, float* out) {
 #pragma omp parallel default(none) \
     shared(train, test, params, out, d, TB, QB, n_qblocks, euclid, to_dist)
     {
-        std::vector<TopK> tops(QB, TopK(params.k));
+        std::vector<Top> tops(QB, Top(params.k));
 
 #pragma omp for schedule(runtime)
         for (long b = 0; b < n_qblocks; ++b) {
             const std::size_t i0 = static_cast<std::size_t>(b) * QB;
             const std::size_t i1 = std::min(i0 + QB, test.n);
-            for (std::size_t i = i0; i < i1; ++i) tops[i - i0] = TopK(params.k);
+            for (std::size_t i = i0; i < i1; ++i) tops[i - i0] = Top(params.k);
 
             for (std::size_t j0 = 0; j0 < train.n; j0 += TB) {
                 const std::size_t j1 = std::min(j0 + TB, train.n);
@@ -447,7 +451,7 @@ static void row_norms_parallel(const Dataset& ds, float* out) {
 
 void knn_omp_blocked4(const Dataset& train, const Dataset& test,
                       const KnnParams& params, std::uint8_t* out) {
-    blocked4_impl(train, test, params, out, /*parallel_norms=*/false);
+    blocked4_impl<TopK>(train, test, params, out, /*parallel_norms=*/false);
 }
 
 // v5b - omp_blocked4 with the row norms of the cosine metric computed in
@@ -458,7 +462,20 @@ void knn_omp_blocked4(const Dataset& train, const Dataset& test,
 // as the parallel part gets faster. Identical to omp_blocked4 for euclidean.
 void knn_omp_blocked4_pn(const Dataset& train, const Dataset& test,
                          const KnnParams& params, std::uint8_t* out) {
-    blocked4_impl(train, test, params, out, /*parallel_norms=*/true);
+    blocked4_impl<TopK>(train, test, params, out, /*parallel_norms=*/true);
+}
+
+// v5c - omp_blocked4 with the top-k kept in a binary max-heap instead of a
+// sorted array (see topk_heap.hpp). One idea: the selection data structure.
+// Insertion sort costs O(k) per ACCEPTED candidate, the heap O(log k); both
+// reject a candidate with one comparison. With the training set in random
+// order a query accepts only about k * (1 + ln(n/k)) candidates out of n
+// (the probability that the j-th one is among the k best so far is k/j):
+// ~50 out of 60000 for k = 5. Expected result: no measurable difference for
+// the k of the assignment (1, 5, 10); the experiment sweeps k up to 128.
+void knn_omp_blocked4_heap(const Dataset& train, const Dataset& test,
+                           const KnnParams& params, std::uint8_t* out) {
+    blocked4_impl<TopKHeap>(train, test, params, out, /*parallel_norms=*/false);
 }
 
 // DIAGNOSTIC variant (not an optimisation): omp_simd where thread t starts

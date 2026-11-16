@@ -23,6 +23,14 @@ Examples:
   python3 scripts/run_benchmarks.py cachefit --variants omp_naive,omp_simd
   python3 scripts/run_benchmarks.py vec      --variants omp_naive,omp_simd
   python3 scripts/run_benchmarks.py sizes    --variants omp_naive
+  python3 scripts/run_benchmarks.py weak     --variants omp_simd,omp_blocked4
+  python3 scripts/run_benchmarks.py topk     --variants omp_blocked4,omp_blocked4_heap
+
+Weak scaling (`weak`): the work grows with the threads so that the work per
+thread stays constant. --weak-mode test (default): n_test = --weak-base * p
+queries on the full training set; --weak-mode train: fixed --n-test queries on a
+training set replicated p times (the memory footprint grows too: p * 188 MB).
+Plot with scripts/plot_weak.py.
 """
 import argparse
 import datetime as dt
@@ -41,6 +49,7 @@ K_VALUES = [1, 5, 10]
 METRICS = ["euclidean", "cosine"]
 TILE_TB = [8, 16, 32, 64, 128, 256]      # training rows per tile (x 3136 B)
 TILE_QB = [4, 8, 16, 32]                 # queries per block (384 / QB blocks)
+TOPK_K = [1, 5, 10, 32, 64, 128]         # top-k policy sweep (kMaxK = 128)
 # n_train : n_test pairs. 64 rows = 200 KB (fits L2), 2000 = 6.3 MB (fits L3),
 # 60000 = 188 MB (DRAM). n_test keeps every run around 0.5-5 s at 1 thread.
 CACHEFIT = [(64, 10000), (2000, 2000), (60000, 100)]
@@ -92,6 +101,8 @@ def run(binary, out_csv, variant, threads, schedule, args, extra, tag=None, env_
 
 
 def data_args(args):
+    if getattr(args, "n_test_override", None):      # weak scaling sets it per point
+        return ["--data", args.data, "--n-test", str(args.n_test_override)]
     if args.synthetic:
         dim = ["--dim", str(args.dim)] if args.dim else []
         return ["--synthetic", "--n-train", str(args.n_train), "--n-test", str(args.n_test)] + dim
@@ -101,7 +112,8 @@ def data_args(args):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("experiment",
-                   choices=["threads", "schedule", "sizes", "kmetric", "tiles", "cachefit", "vec"])
+                   choices=["threads", "schedule", "sizes", "kmetric", "tiles", "cachefit", "vec",
+                            "weak", "topk"])
     p.add_argument("--variants", default="omp_naive", help="comma-separated parallel variants")
     p.add_argument("--binary", default="build/knn")
     p.add_argument("--novec-binary", default="build-novec/knn", help="vec experiment only")
@@ -125,6 +137,10 @@ def main():
                         "(<= 60000: first N rows; multiples of 60000: replicated). "
                         "Default: replicate 1, 2, 4")
     p.add_argument("--dim", type=int, default=0, help="synthetic only: dimensionality (default 784)")
+    p.add_argument("--weak-mode", choices=["test", "train"], default="test",
+                   help="weak scaling: grow the queries (test) or the training set (train) with the threads")
+    p.add_argument("--weak-base", type=int, default=96,
+                   help="weak scaling, mode test: queries per thread (96 = 6 blocks of 16)")
     p.add_argument("--no-seq", action="store_true", help="skip the sequential baseline run")
     p.add_argument("--allow-battery", action="store_true", help="do not abort when on battery")
     args = p.parse_args()
@@ -204,6 +220,23 @@ def main():
                     run(binary, out_csv, v, t, args.schedule, args,
                         ["--n-test", str(nte), "--n-train", str(ntr)], tag=f"{args.tag}cachefit")
                 i += 1
+    elif args.experiment == "weak":
+        # Work per thread constant. No seq run: the reference is the same variant
+        # at 1 thread on the base problem (weak efficiency = T(1) / T(p)).
+        for i, t in enumerate(threads):
+            if args.weak_mode == "test":
+                args.n_test_override, extra = args.weak_base * t, []
+            else:
+                extra = ["--replicate", str(t)]
+            for v in rotated(variants, i):
+                run(binary, out_csv, v, t, args.schedule, args, extra, tag=f"{args.tag}weak_{args.weak_mode}")
+        args.n_test_override = None
+    elif args.experiment == "topk":
+        # Top-k selection policy (insertion sort vs heap) as k grows. Euclidean only.
+        for i, k in enumerate(TOPK_K):
+            seq(["--k", str(k)])
+            for v in rotated(variants, i):
+                run(binary, out_csv, v, args.threads, args.schedule, args, ["--k", str(k)])
     elif args.experiment == "vec":
         # Same variants from the normal build and from build-novec (-fno-tree-vectorize),
         # 1 thread, training in L2 and in DRAM. Binary order alternates as well.

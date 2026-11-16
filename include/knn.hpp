@@ -58,6 +58,11 @@ void knn_omp_blocked4(const Dataset& train, const Dataset& test,
 void knn_omp_blocked4_pn(const Dataset& train, const Dataset& test,
                          const KnnParams& params, std::uint8_t* out);
 
+// omp_blocked4 with the top-k in a binary max-heap (selection policy TopKHeap)
+// instead of the insertion-sorted array. Same predictions, ties included.
+void knn_omp_blocked4_heap(const Dataset& train, const Dataset& test,
+                           const KnnParams& params, std::uint8_t* out);
+
 // DIAGNOSTIC: omp_simd where thread t starts t * KNN_STAGGER_MS ms late, to
 // break the sharing of training rows in L3 between synchronous threads.
 void knn_omp_simd_stagger(const Dataset& train, const Dataset& test,

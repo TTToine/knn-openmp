@@ -14,6 +14,7 @@ const std::vector<Variant>& all_variants() {
         {"omp_aosoa", "omp_soa with the training set in contiguous 64-sample blocks", knn_omp_aosoa, true},
         {"omp_blocked4", "omp_blocked + 4 queries x 1 row micro-kernel", knn_omp_blocked4, true},
         {"omp_blocked4_pn", "omp_blocked4 + parallel row norms (cosine)", knn_omp_blocked4_pn, true},
+        {"omp_blocked4_heap", "omp_blocked4 + top-k in a binary max-heap", knn_omp_blocked4_heap, true},
         {"omp_simd_stagger", "DIAGNOSTIC: omp_simd with staggered thread start (always static)", knn_omp_simd_stagger, true},
     };
     return v;

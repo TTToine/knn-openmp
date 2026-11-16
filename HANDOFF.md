@@ -7,6 +7,10 @@ Aggiornato alla fine di ogni punto di lavoro. Leggere insieme a `CLAUDE.md`
 
 ## Stato (2026-11-16, sessione a batteria: nessuna misura valida oggi)
 
+- **Punto 3 (16/11, a batteria): fatto, non misurato.** Variante
+  `omp_blocked4_heap` (top-k con heap, 0 mismatch anche a k = 128), weak scaling
+  negli script, esperimento `tools/sync_strategies` (6 strategie, tutte uguali al
+  seriale). `ctest` ha ora 2 test.
 - Fasi A, B, C del brief concluse (commit `64fc89f`): campagna valida a metà
   (`threads`, `schedule`), revisione da esaminatore, modello di prestazioni con
   previsioni P-1…P-6 registrate, validazione sull'intero test set a 0 mismatch.
@@ -33,7 +37,8 @@ bash scripts/run_rest.sh  2>&1 | tee results/raw/run_rest_$(date +%Y%m%d_%H%M%S)
 # 2. esperimenti della revisione (~25 min + 15 di sizes): comincia con hwprobe
 bash scripts/run_extra.sh 2>&1 | tee results/raw/run_extra_$(date +%Y%m%d_%H%M%S).log
 
-# 3. esperimenti aggiunti in questa sessione: vedi le voci "MISURA" più sotto
+# 3. esperimenti aggiunti in questa sessione (elenco più sotto)
+bash scripts/run_new.sh   2>&1 | tee results/raw/run_new_$(date +%Y%m%d_%H%M%S).log
 ```
 
 Dopo le misure:
@@ -47,7 +52,13 @@ Dopo le misure:
 
 ## Misure aggiunte in questa sessione
 
-(vuoto: aggiornato a ogni punto)
+Tutte in `scripts/run_new.sh`; previsioni nel diario (voci del 16/11).
+
+| # | esperimento | comando | previsione da verificare |
+|---|---|---|---|
+| N1 | top-k: insertion sort vs heap, k = 1…128 | `run_benchmarks.py topk --variants omp_blocked4,omp_blocked4_heap --threads 6` | T1: nessuna differenza per ogni k |
+| N2 | weak scaling (query ∝ thread; poi training ∝ thread) | `run_benchmarks.py weak ...` + `plot_weak.py` | W1: `omp_blocked4` cala da 4 thread (DRAM) |
+| N3 | sincronizzazione: critical / atomic / reduction / packed / padded | `bash scripts/sync_strategies.sh` | S1–S4: critical peggiora coi thread; packed 5–20× più lenta di padded |
 
 ## Cosa resta
 

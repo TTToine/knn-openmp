@@ -43,7 +43,12 @@ python3 scripts/run_benchmarks.py schedule --variants omp_naive --threads 12
 python3 scripts/run_benchmarks.py kmetric  --variants omp_blocked --threads 12
 python3 scripts/run_benchmarks.py tiles    --variants omp_blocked --threads 6  # KNN_TB x KNN_QB
 bash scripts/cachefit.sh ; bash scripts/novec.sh       # L2/L3/DRAM e vec vs novec
+python3 scripts/run_benchmarks.py weak     --variants omp_simd,omp_blocked4  # weak scaling
+python3 scripts/run_benchmarks.py topk     --variants omp_blocked4,omp_blocked4_heap
+bash scripts/sync_strategies.sh                        # critical/atomic/reduction/false sharing
+bash scripts/run_new.sh                                # tutte le misure aggiunte il 16/11
 python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici + summary
+python3 scripts/plot_weak.py results/raw/weak_*.csv                    # weak scaling + Gustafson
 # Metriche: speedup = T_seq/T_p (traccia); scalabilità = T_var(1)/T_var(p);
 # efficienza = scalabilità/p (NON speedup/p: con SIMD supererebbe 1).
 # --n-test 384 (default): 24 blocchi da 16 query, divisibile per 1,2,4,6,8,12 thread.
@@ -54,12 +59,18 @@ python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici
   loader IDX (MNIST), dati sintetici, `replicate()` per raggiungere ≥ 10 s sequenziali.
 - `include/knn_common.hpp` — mattoni condivisi: distanze scalari, `TopK` (insertion
   sort, tie-break deterministico), voto di maggioranza, norme.
+- `include/topk_heap.hpp` — `TopKHeap`: seconda politica di selezione (max-heap),
+  stessa interfaccia e stessi risultati di `TopK`, pareggi compresi.
 - `src/knn_seq.cpp` — **riferimento sequenziale: oracolo di correttezza e baseline.**
 - `src/knn_omp.cpp` — varianti parallele, una funzione per idea.
 - `src/variants.cpp` — registro delle varianti (nome → funzione).
 - `src/main.cpp` — driver: carica i dati (non cronometrato), esegue warm-up + run,
   cronometra solo la chiamata k-NN con `omp_get_wtime`, valida contro il riferimento
   (cache in `.cache/`), scrive una riga CSV per run.
+- `tools/` — eseguibili a parte: `hwprobe` (frequenza reale, banda DRAM),
+  `sync_strategies` (matrice di confusione con critical / atomic / reduction /
+  contatori privati con e senza padding).
+- `HANDOFF.md` — stato e **coda delle misure** da lanciare in carica.
 - `scripts/` — benchmark, grafici, info di sistema. `tests/smoke_test.sh` — validazione.
 
 ### Aggiungere una variante
@@ -97,9 +108,12 @@ python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici
    ogni riga caricata riusata 4 volte, 4 accumulatori indipendenti). Ponte verso il 5.
 5. [ ] Formulazione matriciale — |a|² + |b|² − 2 a·b con prodotto a blocchi;
    attenzione alla cancellazione numerica.
-6. [ ] Top-k: insertion sort vs heap al crescere di k.
-7. [ ] Extra: weak scaling, analisi bottleneck (compute vs memory bound), confronto
-   con Amdahl.
+6. [x] Top-k: insertion sort vs heap — `omp_blocked4_heap` (`blocked4_impl` è un
+   template sulla politica). Risultato atteso nullo (inserimenti ≈ k·(1+ln(n/k))).
+   Misura in coda (`run_benchmarks.py topk`).
+7. [x] Extra: weak scaling negli script (`run_benchmarks.py weak`, `plot_weak.py`
+   con Gustafson); sincronizzazione e false sharing (`tools/sync_strategies.cpp`).
+   Misure in coda. Resta: fit di Amdahl sui dati di strong scaling.
 
 ## Domande aperte da discutere nel report
 - Oltre 6 thread l'hyperthreading quanto aiuta? (stesse unità AVX condivise)

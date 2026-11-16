@@ -514,3 +514,81 @@ Concordate con lo studente: tutte le proposte di `review.md` §6 tranne la 9
   prima delle misure di `run_extra.sh`.
 
 ---
+
+## 2026-11-16 — Requisiti scoperti della traccia: top-k, weak scaling, sincronizzazione
+Sessione a batteria: **codice e validazione soltanto, nessun tempo**. Ogni voce
+registra l ipotesi e una previsione numerica; le misure sono in `scripts/run_new.sh`.
+
+### Top-k: heap contro insertion sort (`omp_blocked4_heap`)
+- **Cosa:** nuova politica di selezione `TopKHeap` (`include/topk_heap.hpp`): heap
+  binario di massimo sui k migliori. `blocked4_impl` è ora un template sulla
+  politica: `omp_blocked4` = `blocked4_impl<TopK>`, `omp_blocked4_heap` =
+  `blocked4_impl<TopKHeap>`. Una idea: la struttura dati della selezione.
+- **Perché un max-heap per i k più piccoli:** serve solo sapere chi è il peggiore
+  dei k tenuti, ed è la radice. Rifiuto di un candidato: 1 confronto in entrambe
+  le politiche. Inserimento: O(k) spostamenti (insertion sort) contro O(log k).
+- **Stesso risultato, pareggi compresi:** l heap ordina per (distanza, ordine di
+  arrivo); un nuovo arrivato è l ultimo, quindi entra solo se la distanza è
+  *strettamente* minore della radice (stesso test `d < dist[k-1]` di `TopK`).
+  Il voto riordina i k elementi e vota come `TopK`.
+- **Validazione:** 0 mismatch in `ctest` (ora anche con k = 32 e 128 per tutte
+  le varianti, su dati con molti quasi-pareggi) e su MNIST 2000×64.
+- **Il codice di `omp_blocked4` non è cambiato:** stessa sequenza di 6049
+  istruzioni nel corpo parallelo prima e dopo il template (confronto `objdump`
+  dei mnemonici: differiscono solo gli indirizzi). I dati validi restano
+  confrontabili.
+- **Ipotesi (T1): risultato nullo.** Con il training in ordine casuale il j-esimo
+  campione entra tra i k migliori con probabilità k/j: gli inserimenti attesi per
+  query sono k·(1 + ln(n/k)) — 47 per k = 5, **915 per k = 128** su 60000
+  distanze. Anche a k = 128, 915 inserimenti × ~64 spostamenti = 6·10⁴ operazioni
+  contro 4.7·10⁷ elementi del calcolo delle distanze: 0.1%. **Previsione: heap e
+  insertion sort indistinguibili (entro il rumore) per ogni k da 1 a 128.**
+  L heap vincerebbe solo con dati ordinati per distanza *decrescente* (ogni
+  candidato entra): caso avverso che qui non esiste. È la risposta alla richiesta
+  della traccia: il confronto va fatto, e il risultato atteso è che la scelta non
+  conta — *perché* il top-k è una frazione trascurabile del lavoro.
+- **Misura:** `run_benchmarks.py topk` (k = 1, 5, 10, 32, 64, 128).
+
+### Weak scaling (`run_benchmarks.py weak`, `plot_weak.py`)
+- **Cosa:** il problema cresce con i thread, lavoro per thread costante. Due modi:
+  `--weak-mode test` (default): 96·p query sul training completo; `train`:
+  query fisse, training replicato p volte (cresce anche la memoria: p × 188 MB).
+  Metriche: efficienza debole T(1)/T(p) (ideale 1), speedup scalato p·T(1)/T(p)
+  (ideale p), con la retta di Gustafson S(p) = p − s(p − 1) adattata su 2–6 thread.
+- **Ipotesi (W1):** nel modo `test` il traffico DRAM *totale* cresce con p (ogni
+  thread rilegge il training per i propri blocchi), quindi le varianti a blocchi
+  restano efficienti finché p·(banda per thread) < banda DRAM (~16.5 GB/s [I]).
+  **Previsione:** `omp_blocked4` efficienza debole ≥ 0.9 fino a 2 thread, in calo
+  da 4 (satura la DRAM, come nello strong scaling); `omp_blocked` ≥ 0.9 fino a 6
+  (kernel più lento, banda richiesta più bassa); `omp_simd` ≈ 1 fino a 8 *se* il
+  convoglio regge (i thread scorrono lo stesso training in sincronia), crollo a 12.
+  Nel modo `train` il convoglio non può aiutare di più (ogni thread scorre comunque
+  tutto il training, p volte più lungo): efficienza attesa simile, tempi p volte
+  maggiori — è il caso in cui Gustafson e strong scaling raccontano la stessa
+  storia di memoria.
+
+### Strategie di sincronizzazione (`tools/sync_strategies.cpp`)
+- **Perché un esperimento a parte:** nel k-NN non c è nessuna sincronizzazione
+  (ogni query scrive il suo `out[i]`). L unico stato condiviso che ha senso è la
+  **matrice di confusione** della valutazione, un istogramma 10×10: troppo
+  piccola per pesare nel k-NN, quindi la si isola e la si calcola su 2·10⁷ coppie
+  (etichetta, predizione) sintetiche con il 97% sulla diagonale.
+- **Sei strategie**, tutte verificate uguali al calcolo seriale (test `ctest`
+  `sync_strategies`): `serial`; `critical` (un lock globale); `atomic`
+  (`lock add`, niente lock ma la linea di cache della cella rimbalza: condivisione
+  *vera*); `reduction(+: m[:100])` (copia privata per thread, somma finale);
+  `packed` (contatori privati ma interlacciati `[cella][thread]`: nessuna race,
+  ma thread diversi scrivono la stessa linea = **false sharing**); `padded`
+  (una matrice per thread allineata a 64 B con `alignas`).
+  `packed` e `padded` eseguono le stesse istruzioni: cambia solo il layout.
+- **Previsioni (prima della misura), in milioni di aggiornamenti al secondo:**
+  - S1: `critical` è la più lenta e **peggiora** con i thread (contesa sul lock):
+    < 20 M/s a 1 thread, < 5 M/s a 6;
+  - S2: `atomic` a 1 thread costa ~20 cicli per aggiornamento (~200 M/s) e
+    **non scala**: con 10 celle calde ogni incremento è un trasferimento di linea
+    tra core; a 6 thread è più lenta che a 1;
+  - S3: `reduction` ≈ `padded` e scalano quasi linearmente fino a 6 thread
+    (carico: 2 byte letti per aggiornamento, niente scritture condivise);
+  - S4: `packed` a 1 thread = `padded`; a 6 thread è **5–20 volte più lenta** di
+    `padded`, e più lenta di `packed` a 1 thread: è il costo del false sharing.
+- **Misura:** `bash scripts/sync_strategies.sh` (1, 2, 4, 6, 12 thread, 5 run).
