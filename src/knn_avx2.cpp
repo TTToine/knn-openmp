@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <type_traits>
 #include <vector>
 
 #include "knn.hpp"
@@ -104,10 +105,11 @@ template <int MR, int NR, bool EUCLID>
 // The M queries i .. i+M-1 against the tile rows j0 .. j1-1, NR rows at a
 // time (then one at a time for the last j1-j0 mod NR rows). Each query still
 // receives the rows in increasing j: same order of TopK pushes as everywhere.
-template <int M, int NR, bool EUCLID, class ToDist>
+// `sink(top, value, i, j)` turns the kernel output into a distance and pushes it.
+template <int M, int NR, bool EUCLID, class Sink>
 [[gnu::always_inline]] inline void tile_group(const Dataset& train, const Dataset& test, std::size_t i,
                                               std::size_t j0, std::size_t j1, TopK* tops,
-                                              const ToDist& to_dist) {
+                                              const Sink& sink) {
     const std::size_t d = train.d;
     const float* q[M];
     for (int m = 0; m < M; ++m) q[m] = test.row(i + m);
@@ -119,13 +121,37 @@ template <int M, int NR, bool EUCLID, class ToDist>
         kernel_mrnr<M, NR, EUCLID>(q, t, d, s);
         for (int m = 0; m < M; ++m)
             for (int n = 0; n < NR; ++n)
-                tops[m].push(to_dist(s[m * NR + n], i + m, j + n), train.y[j + n]);
+                sink(tops[m], s[m * NR + n], i + m, j + n);
     }
     for (; j < j1; ++j) {   // tile size not a multiple of NR
         const float* t[1] = {train.row(j)};
         float s[M];
         kernel_mrnr<M, 1, EUCLID>(q, t, d, s);
-        for (int m = 0; m < M; ++m) tops[m].push(to_dist(s[m], i + m, j), train.y[j]);
+        for (int m = 0; m < M; ++m) sink(tops[m], s[m], i + m, j);
+    }
+}
+
+// Counters of the last omp_gemm / omp_gemm_exact call (statistics, not timings).
+struct GemmStats {
+    unsigned long long pairs = 0, negative = 0, rechecked = 0;
+    double max_abs_err = 0, max_err_over_scale = 0;   // only with KNN_GEMM_STATS=1
+};
+GemmStats g_gemm_stats;
+
+enum Mode {
+    kDirect = 0,     // the metric as it is: squared differences (euclidean) or dot + cosine
+    kGemm = 1,       // euclidean as |q|^2 + |t|^2 - 2 q.t, in float, as it comes
+    kGemmExact = 2   // the same as a FILTER, exact recomputation of the candidates that may enter
+};
+
+// Squared norms with the same dot kernel, one row per iteration, in parallel
+// (schedule(static): every row costs the same).
+inline void row_sqnorms(const Dataset& ds, float* out) {
+    const long n = static_cast<long>(ds.n);
+#pragma omp parallel for schedule(static) default(none) shared(ds, out, n)
+    for (long i = 0; i < n; ++i) {
+        const float* r[1] = {ds.row(i)};
+        kernel_mrnr<1, 1, false>(r, r, ds.d, &out[i]);
     }
 }
 
@@ -133,32 +159,87 @@ template <int M, int NR, bool EUCLID, class ToDist>
 // tiles of TB training rows, KNN_QB / KNN_TB) around the MR x NR micro-kernel.
 // Queries left over when the block is not a multiple of MR go through the
 // 2 x NR and then the 1 x NR kernel (QB = 16, MR = 6: 6 + 6 + 2 + 2).
-template <int MR, int NR>
+template <int MR, int NR, int MODE = kDirect>
 [[gnu::always_inline]] inline void blocked_mrnr(const Dataset& train, const Dataset& test,
                                                 const KnnParams& params, std::uint8_t* out) {
+    const std::size_t d = train.d;
     const std::size_t TB = env_size("KNN_TB", 32);
     const std::size_t QB = env_size("KNN_QB", 16);
+    const bool euclid = params.metric == Metric::Euclidean;
+    const bool gemm = MODE != kDirect && euclid;   // the matrix form only replaces the euclidean distance
+    const bool stats = gemm && std::getenv("KNN_GEMM_STATS") != nullptr;   // slow: exact distance of EVERY pair
 
-    std::vector<float> train_norm, test_norm;
-    if (params.metric == Metric::Cosine) {
+    std::vector<float> train_norm, test_norm;      // cosine: norms; gemm: SQUARED norms
+    if (gemm) {
+        train_norm.resize(train.n);
+        test_norm.resize(test.n);
+        row_sqnorms(train, train_norm.data());
+        row_sqnorms(test, test_norm.data());
+    } else if (!euclid) {
         train_norm.resize(train.n);
         test_norm.resize(test.n);
         row_norms(train, train_norm.data());   // serial, like omp_blocked (see omp_blocked4_pn)
         row_norms(test, test_norm.data());
     }
-    const bool euclid = params.metric == Metric::Euclidean;
-    auto to_dist_e = [](float v, std::size_t, std::size_t) { return v; };
-    auto to_dist_c = [&](float v, std::size_t i, std::size_t j) {
-        return cosine_distance(v, test_norm[i], train_norm[j]);
-    };
+    // Error bound of the matrix form: |d~ - D| <= slack * (|q|^2 + |t|^2).
+    // The dot product and the two norms are sums of d/8 FMAs per lane + 3 adds
+    // of the horizontal sum + the scalar tail: each has a relative error of at
+    // most n*u on its sum of ABSOLUTE values (n = d/8 + 10, u = 2^-24), and
+    // sum |q_i t_i| <= (|q|^2 + |t|^2) / 2. Adding the three terms and the final
+    // rounding gives about 2*n*u; 4*n*u leaves a factor 2 of safety and also
+    // covers the error of the exact kernel itself (relative n*u on D <= 2*scale).
+    const float slack = 4.0f * static_cast<float>(d / 8 + 10) * 5.9604645e-8f;
 
     const long n_qblocks = static_cast<long>((test.n + QB - 1) / QB);
-    // Shared and read-only: train, test, params, norms (through the lambdas),
-    // sizes. out[]: each element written by one thread. tops: private.
-#pragma omp parallel default(none) \
-    shared(train, test, params, out, TB, QB, n_qblocks, euclid, to_dist_e, to_dist_c)
+    unsigned long long n_pairs = 0, n_negative = 0, n_rechecked = 0;
+    double max_abs_err = 0.0, max_ratio = 0.0;
+    // Shared and read-only: train, test, params, norms, sizes. out[]: each
+    // element written by one thread. tops and the sinks: private. Counters:
+    // reduction (private copy per thread, combined at the end).
+#pragma omp parallel default(none) reduction(+ : n_pairs, n_negative, n_rechecked) \
+    reduction(max : max_abs_err, max_ratio) \
+    shared(train, test, params, out, train_norm, test_norm, d, TB, QB, n_qblocks, euclid, gemm, stats, slack)
     {
         std::vector<TopK> tops(QB, TopK(params.k));
+        unsigned long long pairs = 0, negative = 0, rechecked = 0;   // thread-private
+        double abs_err = 0.0, ratio = 0.0;
+
+        auto exact = [&](std::size_t i, std::size_t j) {   // the 1x1 euclidean kernel of omp_blocked_avx2
+            const float* q[1] = {test.row(i)};
+            const float* t[1] = {train.row(j)};
+            float v;
+            kernel_mrnr<1, 1, true>(q, t, d, &v);
+            return v;
+        };
+        auto sink_euclid = [&](TopK& top, float v, std::size_t, std::size_t j) { top.push(v, train.y[j]); };
+        auto sink_cosine = [&](TopK& top, float v, std::size_t i, std::size_t j) {
+            top.push(cosine_distance(v, test_norm[i], train_norm[j]), train.y[j]);
+        };
+        auto sink_gemm = [&](TopK& top, float dot_qt, std::size_t i, std::size_t j) {
+            const float scale = test_norm[i] + train_norm[j];          // |q|^2 + |t|^2
+            const float approx = scale - 2.0f * dot_qt;                // can come out slightly NEGATIVE
+            ++pairs;
+            negative += approx < 0.0f;
+            if (stats) {
+                const double err = std::fabs(static_cast<double>(approx) - static_cast<double>(exact(i, j)));
+                if (err > abs_err) abs_err = err;
+                if (scale > 0 && err / scale > ratio) ratio = err / scale;
+            }
+            if (MODE == kGemm) {
+                top.push(approx, train.y[j]);
+            } else {
+                // Filter: a candidate whose TRUE distance could be below the k-th
+                // neighbour is recomputed exactly and pushed with its exact
+                // distance; the others are provably rejected (approx - margin >= bound
+                // implies D >= bound). The TopK then sees exactly the pushes of
+                // omp_blocked_avx2 that can change it.
+                const bool full = top.size == top.k;
+                if (!full || approx - slack * scale < top.dist[top.k - 1]) {
+                    ++rechecked;
+                    top.push(exact(i, j), train.y[j]);
+                }
+            }
+        };
 
 #pragma omp for schedule(runtime)
         for (long b = 0; b < n_qblocks; ++b) {
@@ -168,23 +249,34 @@ template <int MR, int NR>
 
             for (std::size_t j0 = 0; j0 < train.n; j0 += TB) {
                 const std::size_t j1 = std::min(j0 + TB, train.n);
+                // One call for a group of M queries, with the kernel and the sink of the metric.
+                auto group = [&](auto m_tag, std::size_t i) {
+                    constexpr int M = decltype(m_tag)::value;
+                    if (gemm)        tile_group<M, NR, false>(train, test, i, j0, j1, &tops[i - i0], sink_gemm);
+                    else if (euclid) tile_group<M, NR, true>(train, test, i, j0, j1, &tops[i - i0], sink_euclid);
+                    else             tile_group<M, NR, false>(train, test, i, j0, j1, &tops[i - i0], sink_cosine);
+                };
                 std::size_t i = i0;
-                for (; i + MR <= i1; i += MR) {
-                    if (euclid) tile_group<MR, NR, true>(train, test, i, j0, j1, &tops[i - i0], to_dist_e);
-                    else        tile_group<MR, NR, false>(train, test, i, j0, j1, &tops[i - i0], to_dist_c);
-                }
+                for (; i + MR <= i1; i += MR) group(std::integral_constant<int, MR>{}, i);
                 if (MR > 2)
-                    for (; i + 2 <= i1; i += 2) {
-                        if (euclid) tile_group<2, NR, true>(train, test, i, j0, j1, &tops[i - i0], to_dist_e);
-                        else        tile_group<2, NR, false>(train, test, i, j0, j1, &tops[i - i0], to_dist_c);
-                    }
-                for (; i < i1; ++i) {
-                    if (euclid) tile_group<1, NR, true>(train, test, i, j0, j1, &tops[i - i0], to_dist_e);
-                    else        tile_group<1, NR, false>(train, test, i, j0, j1, &tops[i - i0], to_dist_c);
-                }
+                    for (; i + 2 <= i1; i += 2) group(std::integral_constant<int, 2>{}, i);
+                for (; i < i1; ++i) group(std::integral_constant<int, 1>{}, i);
             }
             for (std::size_t i = i0; i < i1; ++i) out[i] = tops[i - i0].vote();
         }
+        n_pairs += pairs; n_negative += negative; n_rechecked += rechecked;
+        max_abs_err = abs_err; max_ratio = ratio;
+    }
+    if (gemm) {
+        g_gemm_stats = {n_pairs, n_negative, n_rechecked, max_abs_err, max_ratio};
+        if (std::getenv("KNN_VERBOSE"))
+            std::fprintf(stderr,
+                         "omp_gemm%s: pairs=%llu negative=%llu rechecked=%llu (%.5f%%) slack=%.3g"
+                         " max_abs_err=%.3g max_err/scale=%.3g%s\n",
+                         MODE == kGemmExact ? "_exact" : "", n_pairs, n_negative, n_rechecked,
+                         n_pairs ? 100.0 * static_cast<double>(n_rechecked) / static_cast<double>(n_pairs) : 0.0,
+                         static_cast<double>(slack), max_abs_err, max_ratio,
+                         stats ? "" : " (errors only with KNN_GEMM_STATS=1)");
     }
 }
 
@@ -282,6 +374,30 @@ void knn_omp_mk6x2(const Dataset& train, const Dataset& test, const KnnParams& p
 }
 void knn_omp_mk2x4(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out) {
     blocked_mrnr<2, 4>(train, test, params, out);
+}
+
+// ---------------------------------------------------------------------------
+// Matrix formulation of the euclidean distance:
+//     |q - t|^2 = |q|^2 + |t|^2 - 2 q.t
+// The norms are computed once per row; the pairwise work is a DOT PRODUCT, i.e.
+// a block of the matrix product Q * T^T: 1 FMA per 8 elements instead of
+// vsubps + FMA, and the 4x2 dot micro-kernel (8 accumulators, no spill) fills
+// both FMA ports. The price is numerical: for close vectors the three terms
+// are large and almost cancel (catastrophic cancellation), so the result has
+// an ABSOLUTE error proportional to |q|^2 + |t|^2 instead of a relative error
+// on the distance. Consequences: slightly negative "squared distances", and
+// neighbours at almost the same distance may swap. See report/notes.md.
+//   omp_gemm        the formula as it is (may differ from the reference);
+//   omp_gemm_exact  the formula as a filter + exact recomputation (1x1 kernel)
+//                   of every candidate that could enter the top-k: same
+//                   predictions as omp_blocked_avx2 by construction.
+// For the cosine metric both are simply omp_mk4x2.
+// ---------------------------------------------------------------------------
+void knn_omp_gemm(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out) {
+    blocked_mrnr<4, 2, kGemm>(train, test, params, out);
+}
+void knn_omp_gemm_exact(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out) {
+    blocked_mrnr<4, 2, kGemmExact>(train, test, params, out);
 }
 
 // Shared body of the two 1 x 1 variants below (same tiling as omp_blocked).

@@ -42,4 +42,10 @@ $B tiles --variants omp_mk4x1,omp_mk4x2 --threads 6
 #     1.7-2.2x faster than omp_blocked_avx2 at 1 thread; best step 32-64; step 16 slower than 64
 $B eastep --threads 6
 $B threads --variants omp_blocked_avx2,omp_blocked_ea,omp_blocked4 --tag ea
+# N8. matrix formulation |q|^2+|t|^2-2q.t (~4 min)
+#     prediction F: in L2 omp_gemm up to 2x omp_mk4x1 (1 FP uop per element instead of 2);
+#     omp_gemm_exact <= 10% slower than omp_gemm; on MNIST from 4 threads: same DRAM limit
+G="omp_mk4x1,omp_mk4x2,omp_gemm,omp_gemm_exact"
+$B threads --variants $G --thread-list 1,6 --n-test 9984 --synthetic --n-train 64 --no-seq --tag l2_gemm
+$B threads --variants $G --tag gemm
 echo "### done"

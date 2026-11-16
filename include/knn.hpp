@@ -81,6 +81,12 @@ void knn_omp_mk2x4(const Dataset& train, const Dataset& test, const KnnParams& p
 // features (default 64). Same predictions by construction (proof in the source).
 void knn_omp_blocked_ea(const Dataset& train, const Dataset& test,
                         const KnnParams& params, std::uint8_t* out);
+// Matrix formulation |q|^2 + |t|^2 - 2 q.t on the 4x2 dot micro-kernel.
+// omp_gemm: the formula in float as it is (cancellation: may differ from seq).
+// omp_gemm_exact: formula as a filter + exact recomputation of the candidates.
+// Counters with KNN_VERBOSE=1; KNN_GEMM_STATS=1 also measures the error (slow).
+void knn_omp_gemm(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out);
+void knn_omp_gemm_exact(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out);
 // Fraction of the features evaluated by the last omp_blocked_ea call (1 = no
 // abandoning). A counter, not a timing; printed with KNN_VERBOSE=1.
 extern double knn_ea_fraction;

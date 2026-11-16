@@ -22,6 +22,8 @@ const std::vector<Variant>& all_variants() {
         {"omp_mk6x2", "AVX2 micro-kernel 6 queries x 2 rows (12 accumulators)", knn_omp_mk6x2, true},
         {"omp_mk2x4", "AVX2 micro-kernel 2 queries x 4 rows (8 accumulators)", knn_omp_mk2x4, true},
         {"omp_blocked_ea", "omp_blocked_avx2 + exact early abandoning (euclidean)", knn_omp_blocked_ea, true},
+        {"omp_gemm", "|q|^2+|t|^2-2q.t on the 4x2 dot micro-kernel (float, as is)", knn_omp_gemm, true},
+        {"omp_gemm_exact", "omp_gemm as a filter + exact recomputation of the candidates", knn_omp_gemm_exact, true},
         {"omp_simd_stagger", "DIAGNOSTIC: omp_simd with staggered thread start (always static)", knn_omp_simd_stagger, true},
     };
     return v;

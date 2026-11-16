@@ -66,6 +66,18 @@ for step in 8 16 50 64 4096; do
     fi
   done
 done
+# Shifted data (large norms, same distances): the direct kernels and the
+# exact-recheck matrix formulation must still match the reference. omp_gemm (the
+# plain formula) is NOT tested here on purpose: it fails by design (cancellation).
+for variant in omp_blocked_avx2 omp_mk4x2 omp_blocked_ea omp_gemm_exact; do
+  for off in 30 3000; do
+    if ! OMP_SCHEDULE=static "$KNN" --synthetic --n-train 1500 --n-test 97 --dim 50 --offset "$off" \
+         --variant "$variant" --k 5 --threads 3 --runs 1 --warmup 0 --cache-dir "$CACHE" > /dev/null 2>&1; then
+      echo "FAIL: variant=$variant offset=$off"
+      fail=1
+    fi
+  done
+done
 # Large k (up to kMaxK = 128): stresses the top-k policies (sorted array vs heap)
 # far beyond the k of the assignment. 20 dims + 10 classes = many near ties.
 for variant in $("$KNN" --list | cut -f1); do

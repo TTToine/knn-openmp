@@ -655,8 +655,12 @@ abandoning, qualunque siano TB, QB e i resti. Fa eccezione, per costruzione,
   | 4×1 | 16 | 4 / 4 | 1.25 | 0 |
   | 4×2 | 25 | 8 / 8 | 0.75 | 0 |
   | 2×4 | 25 | 8 / 8 | 0.75 | 0 |
-  | 6×2 | 36 | 12 / 12 | 0.67 | **2 per iterazione** |
+  | 6×2 | 36–37 | 12 / 12 | 0.67 | **2–4 per iterazione** |
 
+  (Il numero esatto dipende dal contesto di compilazione: nel binario finale il
+  kernel euclideo ha 4 accessi allo stack per iterazione = 2 accumulatori in
+  memoria, quello del prodotto scalare 2 = 1 accumulatore. Al limite dei
+  registri l allocazione è fragile: un altro motivo per preferire il 4×2.)
   Nel 6×2 **un accumulatore vive sullo stack**: `vfmadd213ps 0x200(%rsp)` seguito
   da `vmovaps %ymm3, 0x200(%rsp)`. Il conto dei registri lo prevedeva (16 su 16:
   non resta nulla per il temporaneo). Quella catena passa dalla memoria a ogni
@@ -748,3 +752,92 @@ abandoning, qualunque siano TB, QB e i resti. Fa eccezione, per costruzione,
 - **Limiti:** l efficacia dipende dai dati (su dati sintetici isotropi le somme
   parziali crescono tutte uguali e si abbandona tardi) e dall ordine del training
   (la soglia si stringe man mano che arrivano vicini buoni).
+
+## 2026-11-16 — Formulazione matriciale |q|² + |t|² − 2 q·t e analisi numerica
+Fase D2 del brief (opzionale nella traccia). Codice, validazione e **contatori**;
+nessun tempo (misure: `run_new.sh` N8).
+
+- **Varianti** (in `src/knn_avx2.cpp`, sul micro-kernel 4×2 del prodotto scalare):
+  - `omp_gemm` — la formula in float così com è. Norme al quadrato precalcolate
+    (un `parallel for` sulle righe, stesso kernel del prodotto), lavoro per coppia
+    = un prodotto scalare = un blocco del prodotto di matrici Q·Tᵀ.
+  - `omp_gemm_exact` — la formula come **filtro**: un candidato viene ricalcolato
+    con il kernel diretto 1×1 (`omp_blocked_avx2`) solo se
+    `approx − margine < distanza del k-esimo vicino`; gli altri sono rifiutati.
+    Il `TopK` riceve solo distanze *esatte*.
+- **Perché dovrebbe essere più veloce (previsione F):** l euclidea diretta costa 2
+  µop FP per elemento (`vsubps` + FMA) → al massimo 8 elementi/ciclo con 2 porte.
+  Il prodotto scalare ne costa 1 → **16 elementi/ciclo**: in L2 a 1 thread
+  `omp_gemm` dovrebbe arrivare fino a **2× `omp_mk4x1`/`omp_blocked4`** (stessa
+  previsione D del micro-kernel col coseno, senza la divisione finale). Su MNIST
+  da 4 thread in su: uguale agli altri (limite DRAM). `omp_gemm_exact` = `omp_gemm`
+  + ~0.1% di ricalcoli da ~370 cicli = +0.3 cicli su ~6 per coppia: **≤ 10% più
+  lento di `omp_gemm`**.
+
+### Il problema numerico: cancellazione
+D = |q|² + |t|² − 2q·t sottrae numeri grandi e quasi uguali quando q e t sono
+vicini. Ognuno dei tre termini ha un errore *relativo* piccolo (≈ n·u, con
+n ≈ d/8 passi di somma e u = 2⁻²⁴), ma il risultato eredita un errore **assoluto**
+proporzionale alla *scala* S = |q|² + |t|², non a D:
+
+    |D̃ − D| ≲ c · S        contro        |D_diretta − D| ≲ c · D
+
+L errore relativo sulla distanza è amplificato di S/D: enorme per i vicini (D
+piccola), cioè proprio per i candidati che contano.
+
+**Misure (contatori; MNIST 60000 × 64 query, k = 5; `KNN_GEMM_STATS=1` confronta
+ogni coppia con il kernel diretto; riproducibile con `scripts/gemm_numerics.sh`).**
+Per variare S a parità di distanze si trasla tutto il dataset di una costante
+(`--offset X`): le distanze euclidee non cambiano in aritmetica esatta — la
+formula diretta è invariante per traslazione, quella matriciale no.
+
+| offset | errore assoluto max | errore max / S | distanze negative | mismatch `omp_gemm` | mismatch `omp_gemm_exact` | ricalcolate da `_exact` |
+|---|---|---|---|---|---|---|
+| 0 (MNIST) | 1.2·10⁻⁴ | 3.3·10⁻⁷ | 0 | 0 | 0 | 0.09% |
+| 1 | 7.3·10⁻⁴ | 3.3·10⁻⁷ | 0 | 0 | 0 | 0.09% |
+| 4 | 0.012 | 4.5·10⁻⁷ | 0 | 0 | 0 | 0.10% |
+| 16 | 0.19 | 4.5·10⁻⁷ | 0 | 0 | 0 | 0.53% |
+| 64 | 3.0 | 4.7·10⁻⁷ | 0 | 0 | 0 | 99.9% |
+| 256 | 28.8 | 2.8·10⁻⁷ | 13 | **2 su 64** | 0 | 100% |
+| 1024 | 740 | 4.5·10⁻⁷ | **1 058 561 (28%)** | **49 su 64** (accuratezza 22%) | 0 | 100% |
+
+Lettura:
+1. **errore/S è costante** (3–5·10⁻⁷ ≈ 5–8 u) mentre l errore assoluto cresce di
+   6 ordini di grandezza: è la firma della cancellazione. Il modello "errore ∝ S"
+   regge su tutto l intervallo.
+2. **Su MNIST così com è la formula è innocua**: 0 mismatch su 384 query (k = 1, 5,
+   10) e nessuna distanza negativa. I pixel stanno in [0, 1], S ≈ 200, errore
+   ~10⁻⁴ contro distanze dei vicini ~10 e differenze tra candidati ≫ 10⁻⁴.
+   Da confermare sull intero test set (in coda: non si può oggi).
+3. **Non è una proprietà della formula, è una proprietà dei dati**: basta una
+   traslazione (dati non centrati, feature con una media grande) e il risultato
+   degenera — distanze negative (impossibili per un quadrato), poi vicini
+   scambiati, poi rumore puro (22% di accuratezza). La versione diretta sugli
+   stessi dati traslati resta a 0 mismatch.
+4. **Rimedi, dal più debole al più forte:**
+   - *clamp a 0*: toglie i negativi (serve se poi si fa la radice) ma non
+     ripristina l ordine dei vicini: cosmetico per il k-NN;
+   - *centrare i dati* (sottrarre la media delle feature): riduce S, e la distanza
+     non cambia. È il rimedio "gratis": sposta il problema da offset 1024 a 0;
+   - *norme e prodotti in double*: riduce c di 2²⁹, ma dimezza gli elementi per
+     registro (4 double invece di 8 float): si perde il vantaggio di velocità;
+   - **ricalcolo esatto dei candidati** (`omp_gemm_exact`): la formula veloce
+     decide solo chi *scartare*, con un margine di sicurezza; chi può entrare nel
+     top-k viene ricalcolato col kernel diretto. Esatto per costruzione finché il
+     margine è una vera maggiorazione dell errore: margine = 4·n·u·S = 2.57·10⁻⁵·S
+     (n = d/8 + 10), cioè **77 volte** l errore massimo osservato (3.3·10⁻⁷·S).
+     Il margine è argomentato (analisi dell errore delle somme) e verificato
+     empiricamente, non dimostrato all ultima costante: dichiararlo.
+     Costo: 0 mismatch in tutte le righe della tabella; e quando i dati sono
+     ostili (offset ≥ 64) ricalcola tutto, cioè **degrada alla variante esatta
+     invece di sbagliare**.
+5. **Controprova sul top-k:** `omp_gemm_exact` ricalcola 12.3 candidati per query
+   con k = 1, 53.6 con k = 5, 98.1 con k = 10 (384 query). La stima analitica degli
+   inserimenti nel top-k, k·(1 + ln(n/k)), dà 12.0, 52.0, 97.0. Il contatore
+   conferma il conto usato per prevedere che heap e insertion sort sono
+   indistinguibili (previsione T1): il top-k riceve ~50 inserimenti su 60000
+   candidati.
+- **Legame col corso:** stesso schema dell early abandoning — un test economico che
+  scarta quasi tutto, con una garanzia che rende esatto il risultato (lì la
+  monotonia delle somme parziali, qui una maggiorazione dell errore). E stesso
+  micro-kernel del GEMM: la formulazione matriciale è il ponte verso BLAS.

@@ -15,6 +15,11 @@ Aggiornato alla fine di ogni punto di lavoro. Leggere insieme a `CLAUDE.md`
   `omp_blocked_avx2`, `omp_blocked_avx2u4`, `omp_mk4x1/4x2/6x2/2x4`,
   `omp_blocked_ea`. 17 varianti, tutte a 0 mismatch. Assembly controllato
   (`tools/asm_loops.py`). Previsioni A–E e dimostrazione di esattezza nel diario.
+- **Punto 5 (16/11, a batteria): D2 fatta, non misurata.** `omp_gemm` e
+  `omp_gemm_exact` (19 varianti in tutto, 0 mismatch); analisi numerica con
+  contatori nel diario (tabella errore vs offset). Opzione `--offset` nel driver.
+  **Fase F (simulazione d esame): da fare insieme**; traccia delle domande in
+  `report/oral_prep.md`.
 - Fasi A, B, C del brief concluse (commit `64fc89f`): campagna valida a metà
   (`threads`, `schedule`), revisione da esaminatore, modello di prestazioni con
   previsioni P-1…P-6 registrate, validazione sull'intero test set a 0 mismatch.
@@ -66,6 +71,8 @@ Tutte in `scripts/run_new.sh`; previsioni nel diario (voci del 16/11).
 | N5 | stessi kernel su MNIST, strong scaling (+ coseno) | `run_benchmarks.py threads --variants ...` | da 4 thread tutti sullo stesso limite DRAM |
 | N6 | tile sweep per `omp_mk4x1`, `omp_mk4x2` a 6 thread | `run_benchmarks.py tiles ...` | QB = 32 aiuta il kernel più veloce |
 | N7 | early abandoning: passo del controllo, 1 e 6 thread; strong scaling | `run_benchmarks.py eastep --threads 6` | E: 1.7–2.2× `omp_blocked_avx2` a 1 thread; passo ottimo 32–64 |
+| N8 | formulazione matriciale: L2 e MNIST, 1–12 thread | `run_benchmarks.py threads --variants omp_mk4x1,omp_mk4x2,omp_gemm,omp_gemm_exact ...` | F: `omp_gemm` fino a 2× `omp_mk4x1` in L2; `_exact` ≤ 10% più lenta; uguali su MNIST da 4 thread |
+| N9 | validazione sull intero test set delle 10 varianti nuove | `bash scripts/validate_full.sh` (~15 min: i riferimenti sono già in `.cache/`; non è una misura, può girare in qualsiasi condizione) | 0 mismatch (per `omp_gemm`: è una misura, non una garanzia) |
 | N3 | sincronizzazione: critical / atomic / reduction / packed / padded | `bash scripts/sync_strategies.sh` | S1–S4: critical peggiora coi thread; packed 5–20× più lenta di padded |
 
 ## Cosa resta

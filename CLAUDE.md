@@ -47,6 +47,7 @@ python3 scripts/run_benchmarks.py weak     --variants omp_simd,omp_blocked4  # w
 python3 scripts/run_benchmarks.py topk     --variants omp_blocked4,omp_blocked4_heap
 bash scripts/sync_strategies.sh                        # critical/atomic/reduction/false sharing
 python3 scripts/run_benchmarks.py eastep   --threads 6                  # early abandoning: passo
+bash scripts/gemm_numerics.sh                          # contatori (non tempi): errore di omp_gemm vs offset
 bash scripts/run_new.sh                                # tutte le misure aggiunte il 16/11
 python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici + summary
 python3 scripts/plot_weak.py results/raw/weak_*.csv                    # weak scaling + Gustafson
@@ -93,6 +94,9 @@ python3 scripts/plot_weak.py results/raw/weak_*.csv                    # weak sc
 ## Regole invarianti
 - **Non modificare `knn_seq.cpp`** né la semantica di `knn_common.hpp` senza chiedere:
   cambierebbe il riferimento. I kernel ottimizzati vanno nelle varianti.
+- `omp_gemm` è l unica variante che *può* dare mismatch per costruzione
+  (cancellazione): su MNIST e nei test ne dà 0, ma non usarla come esempio di
+  variante esatta. Quella esatta è `omp_gemm_exact`.
 - Mai `-ffast-math` globale. Mai I/O o caricamento dati dentro la regione cronometrata.
 - Il riferimento è compilato con gli stessi flag delle varianti (confronto equo).
 - Con `schedule(runtime)` imposta sempre `OMP_SCHEDULE`: se non è definita, libgomp
@@ -119,8 +123,11 @@ python3 scripts/plot_weak.py results/raw/weak_*.csv                    # weak sc
    contro `omp simd`, 4 accumulatori per distanza, micro-kernel MR×NR (6×2 ha uno
    spill: 16 registri su 16), early abandoning esatto (dimostrazione nel diario e
    nel sorgente; valuta il 41% delle feature su MNIST). Previsioni A–E nel diario.
-5. [ ] Formulazione matriciale — |a|² + |b|² − 2 a·b con prodotto a blocchi;
-   attenzione alla cancellazione numerica.
+5. [x] Formulazione matriciale — `omp_gemm` (formula in float sul micro-kernel 4×2
+   del prodotto scalare) e `omp_gemm_exact` (formula come filtro + ricalcolo esatto
+   dei candidati). Analisi numerica nel diario: errore ∝ |q|²+|t|², innocuo su
+   MNIST, catastrofico se i dati vengono traslati (`--offset`,
+   `scripts/gemm_numerics.sh`). Tempi non misurati (previsione F).
 6. [x] Top-k: insertion sort vs heap — `omp_blocked4_heap` (`blocked4_impl` è un
    template sulla politica). Risultato atteso nullo (inserimenti ≈ k·(1+ln(n/k))).
    Misura in coda (`run_benchmarks.py topk`).

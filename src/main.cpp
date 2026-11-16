@@ -33,6 +33,7 @@ struct Options {
     int classes = 10;
     std::uint32_t seed = 42;
     std::size_t replicate = 1;
+    float offset = 0.0f;               // constant added to every feature (numerical experiment)
     KnnParams params;
     std::string variant = "seq";
     int threads = 0;                   // 0 = OpenMP default
@@ -56,6 +57,9 @@ Data:
   --classes C           synthetic classes (default 10)
   --seed S              synthetic seed (default 42)
   --replicate R         replicate the training set R times (default 1)
+  --offset X            add X to every feature of train and test (default 0). Euclidean
+                        distances do not change in exact arithmetic: used to study the
+                        cancellation of the |a|^2+|b|^2-2ab formulation (omp_gemm)
 k-NN:
   --k K                 neighbours (default 5)
   --metric M            euclidean | cosine (default euclidean)
@@ -89,6 +93,7 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--classes") o.classes = std::stoi(next());
         else if (a == "--seed") o.seed = static_cast<std::uint32_t>(std::stoul(next()));
         else if (a == "--replicate") o.replicate = std::stoul(next());
+        else if (a == "--offset") o.offset = std::stof(next());
         else if (a == "--k") o.params.k = std::stoi(next());
         else if (a == "--metric") {
             if (!parse_metric(next(), o.params.metric)) { std::cerr << "unknown metric\n"; return false; }
@@ -136,6 +141,7 @@ std::string schedule_string() {
 std::string config_key(const Options& o, const Dataset& train, const Dataset& test) {
     std::ostringstream k;
     k << (o.synthetic ? "syn" + std::to_string(o.seed) + "d" + std::to_string(o.dim) : "mnist")
+      << (o.offset != 0.0f ? "_off" + std::to_string(o.offset) : "")
       << "_tr" << train.n << "_te" << test.n << "_k" << o.params.k << "_" << metric_name(o.params.metric);
     return k.str();
 }
@@ -199,6 +205,10 @@ int main(int argc, char** argv) {
         return 1;
     }
     train = replicate(train, o.replicate);
+    if (o.offset != 0.0f) {   // same shift for train and test (not timed)
+        for (auto* ds : {&train, &test})
+            for (std::size_t i = 0; i < ds->n * ds->d; ++i) ds->x[i] += o.offset;
+    }
 
     // schedule(runtime) only matters for parallel variants. NB: if OMP_SCHEDULE is
     // unset, libgomp defaults to dynamic,1 -> always set it explicitly.
