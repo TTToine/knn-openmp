@@ -50,6 +50,7 @@ METRICS = ["euclidean", "cosine"]
 TILE_TB = [8, 16, 32, 64, 128, 256]      # training rows per tile (x 3136 B)
 TILE_QB = [4, 8, 16, 32]                 # queries per block (384 / QB blocks)
 TOPK_K = [1, 5, 10, 32, 64, 128]         # top-k policy sweep (kMaxK = 128)
+EA_STEPS = [16, 32, 64, 128, 256, 4096]  # features between two early-abandon checks (4096 = never abandons)
 # n_train : n_test pairs. 64 rows = 200 KB (fits L2), 2000 = 6.3 MB (fits L3),
 # 60000 = 188 MB (DRAM). n_test keeps every run around 0.5-5 s at 1 thread.
 CACHEFIT = [(64, 10000), (2000, 2000), (60000, 100)]
@@ -79,9 +80,10 @@ def run(binary, out_csv, variant, threads, schedule, args, extra, tag=None, env_
         sys.exit("ABORT: laptop on battery - plug it in (or pass --allow-battery). "
                  f"Results so far are in {out_csv}")
     tag = args.tag if tag is None else tag
+    metric = ["--metric", args.metric] if args.metric else []   # before `extra`: kmetric overrides it
     cmd = [str(binary), "--variant", variant, "--threads", str(threads),
            "--runs", str(args.runs), "--warmup", str(args.warmup),
-           "--csv", str(out_csv), "--tag", tag] + data_args(args) + extra
+           "--csv", str(out_csv), "--tag", tag] + data_args(args) + metric + extra
     # Places = physical cores. Up to 6 threads: one thread per core. Beyond, close
     # puts 2 threads on some cores (hyperthreads) and 1 on the others. NB: with
     # OMP_PLACES=threads + close, 8 threads would land on CPUs 0-7 = only 4 cores
@@ -93,6 +95,9 @@ def run(binary, out_csv, variant, threads, schedule, args, extra, tag=None, env_
           f"sched={schedule:11s} {shown}", flush=True)
     res = subprocess.run(cmd, env=env, cwd=ROOT, text=True, capture_output=True)
     print("   ", res.stdout.strip(), flush=True)
+    for line in res.stderr.splitlines():           # counters printed with KNN_VERBOSE=1
+        if "evaluated" in line or "transpose" in line:
+            print("   ", line.strip(), flush=True)
     if res.returncode != 0:
         print(res.stderr, file=sys.stderr)
         if res.returncode == 2:
@@ -113,7 +118,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("experiment",
                    choices=["threads", "schedule", "sizes", "kmetric", "tiles", "cachefit", "vec",
-                            "weak", "topk"])
+                            "weak", "topk", "eastep"])
     p.add_argument("--variants", default="omp_naive", help="comma-separated parallel variants")
     p.add_argument("--binary", default="build/knn")
     p.add_argument("--novec-binary", default="build-novec/knn", help="vec experiment only")
@@ -137,6 +142,7 @@ def main():
                         "(<= 60000: first N rows; multiples of 60000: replicated). "
                         "Default: replicate 1, 2, 4")
     p.add_argument("--dim", type=int, default=0, help="synthetic only: dimensionality (default 784)")
+    p.add_argument("--metric", default="", help="euclidean | cosine for every run (default: euclidean)")
     p.add_argument("--weak-mode", choices=["test", "train"], default="test",
                    help="weak scaling: grow the queries (test) or the training set (train) with the threads")
     p.add_argument("--weak-base", type=int, default=96,
@@ -237,6 +243,14 @@ def main():
             seq(["--k", str(k)])
             for v in rotated(variants, i):
                 run(binary, out_csv, v, args.threads, args.schedule, args, ["--k", str(k)])
+    elif args.experiment == "eastep":
+        # Early abandoning: check interval sweep (KNN_EA_STEP) at 1 thread and at
+        # --threads, with omp_blocked_avx2 (same kernel, no abandoning) as baseline.
+        for t in sorted({1, args.threads}):
+            run(binary, out_csv, "omp_blocked_avx2", t, args.schedule, args, [], tag=f"{args.tag}ea_base")
+            for i, step in enumerate(EA_STEPS):
+                run(binary, out_csv, "omp_blocked_ea", t, args.schedule, args, [],
+                    tag=f"{args.tag}ea_step{step}", env_extra={"KNN_EA_STEP": str(step), "KNN_VERBOSE": "1"})
     elif args.experiment == "vec":
         # Same variants from the normal build and from build-novec (-fno-tree-vectorize),
         # 1 thread, training in L2 and in DRAM. Binary order alternates as well.

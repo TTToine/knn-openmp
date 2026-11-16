@@ -21,11 +21,16 @@ add_library(knn_core
   src/dataset.cpp
   src/knn_seq.cpp
   src/knn_omp.cpp
+  src/knn_avx2.cpp
   src/variants.cpp
 )
 target_include_directories(knn_core PUBLIC include)
 target_link_libraries(knn_core PUBLIC OpenMP::OpenMP_CXX)
 target_compile_options(knn_core PUBLIC -Wall -Wextra $<$<CONFIG:Release>:-O3>)
+
+# Hand-written intrinsics need the instruction sets enabled even when
+# KNN_NATIVE is off (the i7-10750H has AVX2 and FMA).
+set_source_files_properties(src/knn_avx2.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mfma")
 
 # NB: never add -ffast-math globally: it changes the reference results.
 if(KNN_NATIVE)

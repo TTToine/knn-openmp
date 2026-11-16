@@ -592,3 +592,159 @@ registra l ipotesi e una previsione numerica; le misure sono in `scripts/run_new
   - S4: `packed` a 1 thread = `padded`; a 6 thread è **5–20 volte più lenta** di
     `padded`, e più lenta di `packed` a 1 thread: è il costo del false sharing.
 - **Misura:** `bash scripts/sync_strategies.sh` (1, 2, 4, 6, 12 thread, 5 run).
+
+## 2026-11-16 — Varianti avanzate: intrinsics AVX2, micro-kernel MR×NR, early abandoning
+Sessione a batteria: codice, validazione, assembly e **contatori**; nessun tempo.
+Tutte le varianti sono in `src/knn_avx2.cpp` (compilato con `-mavx2 -mfma`), tutte a
+**0 mismatch** in `ctest` (17 varianti; TB/QB dispari; k fino a 128) e su MNIST
+60000 × 64 query con entrambe le metriche. Misure: `scripts/run_new.sh` N4–N7.
+Parametri del modello: f ≈ 4.2 GHz **[I]**, 2 porte FP, FMA con latenza 4 cicli.
+
+Proprietà comune (risolve il punto sottile di `review.md` §4.3): tutti i kernel di
+questo file calcolano la distanza di una coppia con la **stessa sequenza di
+operazioni float** (un accumulatore a 8 corsie aggiornato con FMA esplicite, somma
+orizzontale `hsum256` a ordine fisso, coda scalare con `std::fma`). Quindi una
+coppia riceve gli stessi bit da ogni kernel MR×NR e dal kernel con early
+abandoning, qualunque siano TB, QB e i resti. Fa eccezione, per costruzione,
+`omp_blocked_avx2u4` (32 somme parziali).
+
+### 1. Intrinsics scritti a mano contro `omp simd` (`omp_blocked_avx2`)
+- **Idea:** stesso algoritmo di `omp_blocked`; cambia *chi* vettorizza. Collega la
+  lezione sugli intrinsics SSE: `_mm256_loadu_ps` / `_mm256_sub_ps` /
+  `_mm256_fmadd_ps` sono la versione a 256 bit (8 float) di `_mm_*_ps` (4 float).
+- **Assembly (verificato con `tools/asm_loops.py`):** il loop di `omp_blocked`
+  (`omp simd`) e quello scritto a mano sono lo stesso: 6 istruzioni, 1 `vsubps`,
+  1 `vfmadd231ps` su 1 accumulatore, 2 operandi in memoria. Idem `omp_blocked4`
+  e `omp_mk4x1`: 16 istruzioni, 4 `vsubps`, 4 `vfmadd231ps`, 5 operandi in memoria.
+- **Previsione A:** `omp_blocked_avx2` = `omp_blocked` e `omp_mk4x1` =
+  `omp_blocked4` entro ±3%. Messaggio: per questo kernel il compilatore con la
+  direttiva giusta fa quanto gli intrinsics; gli intrinsics servono dove la
+  direttiva non arriva (punti 2, 3, 4).
+- **Cosa `omp simd` non sa fare (scoperto provando):** la generalizzazione naturale
+  di `omp_blocked4`, `#pragma omp simd reduction(+: s)` con `s[MR*NR]` array, viene
+  vettorizzata malissimo da GCC 15: accumulatori sullo stack, `vextractf128` /
+  `vinsertf128` a ogni iterazione. Per questo il micro-kernel generico usa gli
+  intrinsics.
+
+### 2. Quattro accumulatori sulla stessa distanza (`omp_blocked_avx2u4`)
+- **Idea:** spezzare la catena di dipendenza *senza* cambiare il flusso dei dati:
+  le feature di una coppia vanno a turno su 4 accumulatori. `omp simd` dà un solo
+  accumulatore vettoriale: il loop resta legato alla latenza della FMA.
+- **Assembly:** 16 istruzioni, 4 FMA su 4 accumulatori, **8** operandi in memoria
+  (2 load per FMA; `omp_blocked4` ne ha 1.25: lì la riga di training è riusata).
+- **Previsione B (L2, 1 thread):** 8 µop FP ogni 32 elementi = 4 cicli sulle 2
+  porte, e 8 load ogni 4 cicli = le 2 porte di load **sature**: 2.5–3.5× più
+  veloce di `omp_blocked_avx2` (non 4×: il kernel a 1 accumulatore sovrappone già
+  distanze consecutive grazie all esecuzione fuori ordine, review §1-E), e
+  0.8–1.0× `omp_blocked4`. Su MNIST da 4 thread: uguale a `omp_blocked4` (DRAM).
+  Insegna che latenza nascosta e riuso dei dati sono due cose distinte:
+  `omp_blocked4` le fa entrambe, questa variante solo la prima.
+
+### 3. Micro-kernel a registri MR×NR (`omp_mk4x1`, `omp_mk4x2`, `omp_mk6x2`, `omp_mk2x4`)
+- **Idea (fase D1 del brief):** MR query × NR righe di training per passata,
+  MR·NR accumulatori indipendenti; ogni vettore di training riusato MR volte, ogni
+  vettore di query NR volte. MR e NR sono parametri template di `kernel_mrnr` e
+  `blocked_mrnr` (blocking di cache esterno uguale a `omp_blocked`). Query di
+  resto: kernel 2×NR, poi 1×NR; righe di resto della tile: kernel MR×1.
+- **Budget dei registri (16 ymm):** MR·NR accumulatori + NR vettori di training
+  + 1–2 temporanei. 4×2: 8 + 2 + 2 = 12; 2×4: 8 + 4 + 2 = 14; 6×2: 12 + 2 + 2 = 16.
+- **Assembly:**
+
+  | kernel | istruzioni | FMA / accumulatori | load per FMA | accessi allo stack |
+  |---|---|---|---|---|
+  | 4×1 | 16 | 4 / 4 | 1.25 | 0 |
+  | 4×2 | 25 | 8 / 8 | 0.75 | 0 |
+  | 2×4 | 25 | 8 / 8 | 0.75 | 0 |
+  | 6×2 | 36 | 12 / 12 | 0.67 | **2 per iterazione** |
+
+  Nel 6×2 **un accumulatore vive sullo stack**: `vfmadd213ps 0x200(%rsp)` seguito
+  da `vmovaps %ymm3, 0x200(%rsp)`. Il conto dei registri lo prevedeva (16 su 16:
+  non resta nulla per il temporaneo). Quella catena passa dalla memoria a ogni
+  iterazione: FMA (4 cicli) + store-to-load forwarding (~5 cicli) ≈ 9–10 cicli.
+- **Previsione C (euclidea): nessun guadagno oltre il 4×1.** Per elemento servono
+  2 µop FP (`vsubps` + FMA) e le porte FP sono 2: 1 coppia-vettore per ciclo =
+  24 flop/ciclo *qualunque* siano MR e NR. Il 4×1 è già bilanciato (4 catene ×
+  latenza 4 = 4 cicli = 8 µop / 2 porte): più accumulatori non aggiungono porte.
+  Attesi 4×2, 2×4, 6×2 entro ±10% dal 4×1 in L2; identici su MNIST (limite DRAM).
+- **Previsione D (coseno): qui il guadagno c è.** Il prodotto scalare ha 1 µop FP
+  per elemento (FMA con operando in memoria): il 4×1 ha 4 FMA per iterazione ed è
+  limitato dalla *latenza* (4 cicli → 1 coppia-vettore/ciclo, metà delle porte
+  inutilizzate). Con 8 accumulatori (4×2, 2×4) le 8 FMA riempiono le 2 porte in
+  4 cicli: **fino a 2× il 4×1 in L2**. Il 6×2 ha 12 FMA = 6 cicli sulle porte, ma
+  la catena sullo stack ne chiede 9–10: **più lento del 4×2** (0.6–0.7×), più
+  veloce del 4×1 (~1.25×). Sarebbe la prova che lo spill conta: stesso sorgente,
+  due registri in meno.
+- **L1 (review §3):** il kernel tiene in L1 (MR + NR) righe × 3136 B: 4×2 = 18.8 KB,
+  6×2 = 25 KB su 32 KB; con 2 hyperthread per core 6×2 esce dalla L1 (50 KB).
+- **Legame col prossimo passo:** il micro-kernel del prodotto scalare è già il
+  cuore di un GEMM: la formulazione |a|² + |b|² − 2a·b userebbe proprio il kernel
+  che la previsione D indica come il più veloce (1 µop per elemento invece di 2).
+
+### 4. Early abandoning esatto (`omp_blocked_ea`)
+- **Idea:** per l euclidea, interrompere il calcolo di una distanza appena la
+  somma parziale raggiunge la distanza del k-esimo vicino corrente della query:
+  quel candidato non può più entrare nel top-k. Controllo ogni `KNN_EA_STEP`
+  feature (default 64 = 8 iterazioni AVX2): un controllo per elemento ucciderebbe
+  la vettorizzazione. Base: `omp_blocked_avx2` (stesso kernel 1×1, stesso blocking).
+- **Dimostrazione che è esatto (non approssimato).** Tesi: se il kernel abbandona,
+  `TopK` avrebbe rifiutato la distanza completa D (rifiuta quando `!(D < bound)`).
+  1. *Ogni corsia dell accumulatore è non decrescente in float.* L aggiornamento è
+     acc′ = fl(e·e + acc) (una FMA: e·e calcolato esatto, un solo arrotondamento).
+     e·e ≥ 0, quindi il valore reale e·e + acc ≥ acc. L arrotondamento IEEE è
+     monotono (x ≥ y ⇒ fl(x) ≥ fl(y)) e acc è rappresentabile (fl(acc) = acc):
+     fl(e·e + acc) ≥ acc.
+  2. *`hsum256` è monotona in ogni corsia.* È una sequenza fissa di somme a due
+     operandi di valori ≥ 0; per la stessa monotonia dell arrotondamento,
+     aumentare un operando non può diminuire il risultato di una somma, e per
+     induzione nemmeno il risultato finale. Quindi hsum(acc ora) ≤ hsum(acc alla fine).
+  3. *La coda scalare* (d non multiplo di 8) aggiunge termini ≥ 0 con la stessa FMA.
+  Dunque parziale ≤ D. Se parziale ≥ bound allora D ≥ bound, cioè `!(D < bound)`:
+  rifiutato. ∎ Con la sottrazione al posto della somma (prodotto scalare, termini
+  di segno qualsiasi) il passo 1 cade: per questo il coseno non viene abbandonato.
+  Nota: la monotonia vale **in float**, non solo in aritmetica esatta — è questo
+  che rende il taglio sicuro senza margini di tolleranza.
+- **Conseguenza verificabile:** quando non abbandona, il kernel restituisce gli
+  stessi bit di `omp_blocked_avx2`; quindi le due varianti devono dare le stesse
+  predizioni per *ogni* valore del passo. Verificato: 0 mismatch con
+  `KNN_EA_STEP` = 8, 16, 50 (arrotondato a 48), 64, 4096 (mai un controllo utile)
+  in `ctest`, e su MNIST 60000 × 64 per k = 1, 5, 10 × passo 16…256.
+- **Contatore (non è un tempo): frazione delle feature effettivamente valutate**,
+  MNIST 60000 × 64 query (`KNN_VERBOSE=1`). Stima a priori, scritta prima di
+  guardare: 50–65% (le prime ~100 feature di MNIST sono bordi neri e non
+  contribuiscono). Misurato:
+
+  | passo | 16 | 32 | 64 | 128 | 256 |
+  |---|---|---|---|---|---|
+  | k = 1 | 33.7% | 34.7% | 36.7% | 41.1% | 48.5% |
+  | k = 5 | 37.9% | 38.9% | **40.9%** | 45.3% | 54.3% |
+  | k = 10 | 40.0% | 41.0% | 43.0% | 47.4% | 56.8% |
+
+  Meglio della stima: si salta circa il 60% del lavoro. Cresce con k (soglia più
+  larga) e col passo (si esce più tardi).
+- **Legame con la branch prediction.** Il loop interno ha due salti. Quello di
+  fine loop è perfettamente prevedibile. Quello di abbandono dipende dai dati: per
+  ogni candidato è "non preso" per alcuni controlli e poi "preso" una volta, in un
+  punto che il predittore non può conoscere → **circa un salto sbagliato per
+  candidato** (~15–20 cicli per svuotare la pipeline, più il lavoro speculativo
+  buttato: il processore ha già iniziato le iterazioni successive della stessa
+  riga). In più il confronto dipende dalla catena delle FMA, quindi il salto si
+  risolve tardi. Conto: una distanza completa costa ~370 cicli (89 ns: da
+  `omp_blocked` a 1 thread, 26.5 GFLOP/s); con il 41% diventano ~150 + ~20 di
+  salto sbagliato + ~15 di controlli (5 × `hsum256`). Il salto sbagliato vale
+  ~10% del tempo risparmiato: l early abandoning conviene perché ogni salto
+  sbagliato fa risparmiare ~58 iterazioni, non perché sia gratis. Con un passo
+  piccolo i controlli aumentano e i salti restano uno per candidato; con una
+  distanza corta (poche feature) il bilancio si rovescerebbe. In WSL2 non ci sono
+  contatori hardware (`perf`): i salti sbagliati restano dedotti dal modello.
+- **Previsione E:** a 1 thread su MNIST `omp_blocked_ea` è **1.7–2.2× più veloce
+  di `omp_blocked_avx2`** e circa pari a `omp_blocked4` (che fa tutto il lavoro,
+  ma 2.3× più in fretta); passo ottimo 32–64; passo 16 più lento di 64 nonostante
+  valuti meno feature (38% contro 41%: i controlli raddoppiano due volte); passo
+  4096 = `omp_blocked_avx2` + qualche %. A 12 thread guadagno ≥ 1.3×.
+- **Perché non si compone col micro-kernel:** l abbandono è una decisione *per
+  coppia*; il micro-kernel 4×1 fa avanzare 4 coppie insieme. Due modi di andare
+  più veloci — fare meno lavoro (algoritmo) o fare lo stesso lavoro più in fretta
+  (architettura) — che qui si escludono. È una buona domanda d esame.
+- **Limiti:** l efficacia dipende dai dati (su dati sintetici isotropi le somme
+  parziali crescono tutte uguali e si abbandona tardi) e dall ordine del training
+  (la soglia si stringe man mano che arrivano vicini buoni).

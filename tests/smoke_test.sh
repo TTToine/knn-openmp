@@ -33,8 +33,8 @@ done
 
 # Blocked variants: odd tile / query-block sizes (partial tiles, partial blocks,
 # query groups that are not a multiple of 4, tiles larger than the data).
-for variant in $("$KNN" --list | cut -f1 | grep blocked); do
-  for tbqb in "1 1" "7 5" "13 97" "100000 1000" "32 6"; do
+for variant in $("$KNN" --list | cut -f1 | grep -E "blocked|_mk"); do
+  for tbqb in "1 1" "7 5" "13 97" "100000 1000" "32 6" "33 16"; do
     set -- $tbqb
     for metric in euclidean cosine; do
       if ! KNN_TB="$1" KNN_QB="$2" OMP_SCHEDULE=dynamic,2 "$KNN" --synthetic --n-train 1500 --n-test 97 \
@@ -54,6 +54,17 @@ for variant in $("$KNN" --list | cut -f1); do
     echo "FAIL: variant=$variant k > n_train"
     fail=1
   fi
+done
+# Early abandoning: every check interval must give the same predictions (the
+# abandon rule is exact), including a non-multiple of 8 and one larger than d.
+for step in 8 16 50 64 4096; do
+  for k in 1 5; do
+    if ! KNN_EA_STEP="$step" OMP_SCHEDULE=static "$KNN" --synthetic --n-train 1500 --n-test 97 --dim 50 \
+         --variant omp_blocked_ea --k "$k" --threads 3 --runs 1 --warmup 0 --cache-dir "$CACHE" > /dev/null 2>&1; then
+      echo "FAIL: omp_blocked_ea KNN_EA_STEP=$step k=$k"
+      fail=1
+    fi
+  done
 done
 # Large k (up to kMaxK = 128): stresses the top-k policies (sorted array vs heap)
 # far beyond the k of the assignment. 20 dims + 10 classes = many near ties.

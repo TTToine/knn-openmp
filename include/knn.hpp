@@ -63,6 +63,28 @@ void knn_omp_blocked4_pn(const Dataset& train, const Dataset& test,
 void knn_omp_blocked4_heap(const Dataset& train, const Dataset& test,
                            const KnnParams& params, std::uint8_t* out);
 
+// ---- variants written with AVX2/FMA intrinsics (src/knn_avx2.cpp) ----
+// omp_blocked with the 1x1 distance kernel written by hand (vs `omp simd`).
+void knn_omp_blocked_avx2(const Dataset& train, const Dataset& test,
+                          const KnnParams& params, std::uint8_t* out);
+// omp_blocked_avx2 with 4 accumulators on each distance (latency hiding only).
+void knn_omp_blocked_avx2u4(const Dataset& train, const Dataset& test,
+                            const KnnParams& params, std::uint8_t* out);
+// Register-blocked micro-kernels MR queries x NR training rows (template):
+// MR*NR accumulators, every loaded vector reused. 4x1 = twin of omp_blocked4.
+void knn_omp_mk4x1(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out);
+void knn_omp_mk4x2(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out);
+void knn_omp_mk6x2(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out);
+void knn_omp_mk2x4(const Dataset& train, const Dataset& test, const KnnParams& params, std::uint8_t* out);
+// omp_blocked_avx2 + exact early abandoning of the euclidean distance: the
+// partial sum is compared with the current k-th neighbour every KNN_EA_STEP
+// features (default 64). Same predictions by construction (proof in the source).
+void knn_omp_blocked_ea(const Dataset& train, const Dataset& test,
+                        const KnnParams& params, std::uint8_t* out);
+// Fraction of the features evaluated by the last omp_blocked_ea call (1 = no
+// abandoning). A counter, not a timing; printed with KNN_VERBOSE=1.
+extern double knn_ea_fraction;
+
 // DIAGNOSTIC: omp_simd where thread t starts t * KNN_STAGGER_MS ms late, to
 // break the sharing of training rows in L3 between synchronous threads.
 void knn_omp_simd_stagger(const Dataset& train, const Dataset& test,

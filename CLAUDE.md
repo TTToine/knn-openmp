@@ -46,6 +46,7 @@ bash scripts/cachefit.sh ; bash scripts/novec.sh       # L2/L3/DRAM e vec vs nov
 python3 scripts/run_benchmarks.py weak     --variants omp_simd,omp_blocked4  # weak scaling
 python3 scripts/run_benchmarks.py topk     --variants omp_blocked4,omp_blocked4_heap
 bash scripts/sync_strategies.sh                        # critical/atomic/reduction/false sharing
+python3 scripts/run_benchmarks.py eastep   --threads 6                  # early abandoning: passo
 bash scripts/run_new.sh                                # tutte le misure aggiunte il 16/11
 python3 scripts/plot_results.py results/raw/threads_*.csv              # grafici + summary
 python3 scripts/plot_weak.py results/raw/weak_*.csv                    # weak scaling + Gustafson
@@ -63,6 +64,14 @@ python3 scripts/plot_weak.py results/raw/weak_*.csv                    # weak sc
   stessa interfaccia e stessi risultati di `TopK`, pareggi compresi.
 - `src/knn_seq.cpp` — **riferimento sequenziale: oracolo di correttezza e baseline.**
 - `src/knn_omp.cpp` — varianti parallele, una funzione per idea.
+- `src/knn_avx2.cpp` — varianti con **intrinsics AVX2/FMA** (compilato con
+  `-mavx2 -mfma`): `omp_blocked_avx2` (kernel 1×1 a mano), `omp_blocked_avx2u4`
+  (4 accumulatori per distanza), `omp_mk{4x1,4x2,6x2,2x4}` (micro-kernel a registri
+  MR×NR, template), `omp_blocked_ea` (early abandoning esatto, `KNN_EA_STEP`).
+  Tutti i kernel del file danno gli stessi bit per una stessa coppia (tranne u4).
+- `tools/asm_loops.py` — elenca i loop caldi di una funzione del binario:
+  accumulatori, load, accessi allo stack (spill). Es.:
+  `python3 tools/asm_loops.py build/knn mrnrILi6ELi2 --show`.
 - `src/variants.cpp` — registro delle varianti (nome → funzione).
 - `src/main.cpp` — driver: carica i dati (non cronometrato), esegue warm-up + run,
   cronometra solo la chiamata k-NN con `omp_get_wtime`, valida contro il riferimento
@@ -106,6 +115,10 @@ python3 scripts/plot_weak.py results/raw/weak_*.csv                    # weak sc
    (`run_benchmarks.py tiles`).
 4b. [x] `omp_blocked4` — micro-kernel 4 query × 1 riga di training (register blocking:
    ogni riga caricata riusata 4 volte, 4 accumulatori indipendenti). Ponte verso il 5.
+4c. [x] Varianti avanzate (16/11, `src/knn_avx2.cpp`, non misurate): intrinsics
+   contro `omp simd`, 4 accumulatori per distanza, micro-kernel MR×NR (6×2 ha uno
+   spill: 16 registri su 16), early abandoning esatto (dimostrazione nel diario e
+   nel sorgente; valuta il 41% delle feature su MNIST). Previsioni A–E nel diario.
 5. [ ] Formulazione matriciale — |a|² + |b|² − 2 a·b con prodotto a blocchi;
    attenzione alla cancellazione numerica.
 6. [x] Top-k: insertion sort vs heap — `omp_blocked4_heap` (`blocked4_impl` è un

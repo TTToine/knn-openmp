@@ -11,6 +11,10 @@ Aggiornato alla fine di ogni punto di lavoro. Leggere insieme a `CLAUDE.md`
   `omp_blocked4_heap` (top-k con heap, 0 mismatch anche a k = 128), weak scaling
   negli script, esperimento `tools/sync_strategies` (6 strategie, tutte uguali al
   seriale). `ctest` ha ora 2 test.
+- **Punto 4 (16/11, a batteria): fatto, non misurato.** `src/knn_avx2.cpp`:
+  `omp_blocked_avx2`, `omp_blocked_avx2u4`, `omp_mk4x1/4x2/6x2/2x4`,
+  `omp_blocked_ea`. 17 varianti, tutte a 0 mismatch. Assembly controllato
+  (`tools/asm_loops.py`). Previsioni A–E e dimostrazione di esattezza nel diario.
 - Fasi A, B, C del brief concluse (commit `64fc89f`): campagna valida a metà
   (`threads`, `schedule`), revisione da esaminatore, modello di prestazioni con
   previsioni P-1…P-6 registrate, validazione sull'intero test set a 0 mismatch.
@@ -58,6 +62,10 @@ Tutte in `scripts/run_new.sh`; previsioni nel diario (voci del 16/11).
 |---|---|---|---|
 | N1 | top-k: insertion sort vs heap, k = 1…128 | `run_benchmarks.py topk --variants omp_blocked4,omp_blocked4_heap --threads 6` | T1: nessuna differenza per ogni k |
 | N2 | weak scaling (query ∝ thread; poi training ∝ thread) | `run_benchmarks.py weak ...` + `plot_weak.py` | W1: `omp_blocked4` cala da 4 thread (DRAM) |
+| N4 | kernel in L2 (64 righe), 1 e 6 thread, euclidea e coseno | `run_benchmarks.py threads --synthetic --n-train 64 ...` | A: intrinsics = `omp simd`; B: u4 2.5–3.5× avx2; C: MR×NR euclidea ≈ 4×1; D: coseno 4×2 fino a 2× il 4×1, 6×2 più lento del 4×2 (spill) |
+| N5 | stessi kernel su MNIST, strong scaling (+ coseno) | `run_benchmarks.py threads --variants ...` | da 4 thread tutti sullo stesso limite DRAM |
+| N6 | tile sweep per `omp_mk4x1`, `omp_mk4x2` a 6 thread | `run_benchmarks.py tiles ...` | QB = 32 aiuta il kernel più veloce |
+| N7 | early abandoning: passo del controllo, 1 e 6 thread; strong scaling | `run_benchmarks.py eastep --threads 6` | E: 1.7–2.2× `omp_blocked_avx2` a 1 thread; passo ottimo 32–64 |
 | N3 | sincronizzazione: critical / atomic / reduction / packed / padded | `bash scripts/sync_strategies.sh` | S1–S4: critical peggiora coi thread; packed 5–20× più lenta di padded |
 
 ## Cosa resta
