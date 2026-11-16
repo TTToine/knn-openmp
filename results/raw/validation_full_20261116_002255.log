@@ -1,0 +1,53 @@
+# full-test-set validation - NOT A TIMING EXPERIMENT (see scripts/validate_full.sh)
+# commit 98806d6   2026-11-16T00:22:55+01:00
+# references ready 2026-11-16T00:36:51+01:00
+metric=euclidean k=1 rc=0 omp_naive    threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=1 rc=0 omp_simd     threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=1 rc=0 omp_blocked  threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=1 rc=0 omp_soa      threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=1 rc=0 omp_aosoa    threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=1 rc=0 omp_blocked4 threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=5 rc=0 omp_naive    threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=5 rc=0 omp_simd     threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=5 rc=0 omp_blocked  threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=5 rc=0 omp_soa      threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=5 rc=0 omp_aosoa    threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=5 rc=0 omp_blocked4 threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=10 rc=0 omp_naive    threads=8   acc=0.9683 mismatches=0
+metric=euclidean k=10 rc=0 omp_simd     threads=8   acc=0.9683 mismatches=0
+metric=euclidean k=10 rc=0 omp_blocked  threads=8   acc=0.9683 mismatches=0
+metric=euclidean k=10 rc=0 omp_soa      threads=8   acc=0.9683 mismatches=0
+metric=euclidean k=10 rc=0 omp_aosoa    threads=8   acc=0.9683 mismatches=0
+metric=euclidean k=10 rc=0 omp_blocked4 threads=8   acc=0.9683 mismatches=0
+metric=cosine k=1 rc=0 omp_naive    threads=8   acc=0.9723 mismatches=0
+metric=cosine k=1 rc=0 omp_simd     threads=8   acc=0.9723 mismatches=0
+metric=cosine k=1 rc=0 omp_blocked  threads=8   acc=0.9723 mismatches=0
+metric=cosine k=1 rc=0 omp_soa      threads=8   acc=0.9723 mismatches=0
+metric=cosine k=1 rc=0 omp_aosoa    threads=8   acc=0.9723 mismatches=0
+metric=cosine k=1 rc=0 omp_blocked4 threads=8   acc=0.9723 mismatches=0
+metric=cosine k=5 rc=0 omp_naive    threads=8   acc=0.9737 mismatches=0
+metric=cosine k=5 rc=0 omp_simd     threads=8   acc=0.9737 mismatches=0
+metric=cosine k=5 rc=0 omp_blocked  threads=8   acc=0.9737 mismatches=0
+metric=cosine k=5 rc=0 omp_soa      threads=8   acc=0.9737 mismatches=0
+metric=cosine k=5 rc=0 omp_aosoa    threads=8   acc=0.9737 mismatches=0
+metric=cosine k=5 rc=0 omp_blocked4 threads=8   acc=0.9737 mismatches=0
+metric=cosine k=10 rc=0 omp_naive    threads=8   acc=0.9724 mismatches=0
+metric=cosine k=10 rc=0 omp_simd     threads=8   acc=0.9724 mismatches=0
+metric=cosine k=10 rc=0 omp_blocked  threads=8   acc=0.9724 mismatches=0
+metric=cosine k=10 rc=0 omp_soa      threads=8   acc=0.9724 mismatches=0
+metric=cosine k=10 rc=0 omp_aosoa    threads=8   acc=0.9724 mismatches=0
+metric=cosine k=10 rc=0 omp_blocked4 threads=8   acc=0.9724 mismatches=0
+# done 2026-11-16T01:11:32+01:00 - ALL VARIANTS MATCH THE REFERENCE
+# --- variants added after the review (binary built from commit 12c77b5 sources, same references) ---
+metric=euclidean k=1 rc=0 omp_blocked4_pn threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=1 rc=0 omp_simd_stagger threads=8   acc=0.9691 mismatches=0
+metric=euclidean k=5 rc=0 omp_blocked4_pn threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=5 rc=0 omp_simd_stagger threads=8   acc=0.9693 mismatches=0
+metric=euclidean k=10 rc=0 omp_blocked4_pn threads=8   acc=0.9683 mismatches=0
+metric=euclidean k=10 rc=0 omp_simd_stagger threads=8   acc=0.9683 mismatches=0
+metric=cosine k=1 rc=0 omp_blocked4_pn threads=8   acc=0.9723 mismatches=0
+metric=cosine k=1 rc=0 omp_simd_stagger threads=8   acc=0.9723 mismatches=0
+metric=cosine k=5 rc=0 omp_blocked4_pn threads=8   acc=0.9737 mismatches=0
+metric=cosine k=5 rc=0 omp_simd_stagger threads=8   acc=0.9737 mismatches=0
+metric=cosine k=10 rc=0 omp_blocked4_pn threads=8   acc=0.9724 mismatches=0
+metric=cosine k=10 rc=0 omp_simd_stagger threads=8   acc=0.9724 mismatches=0

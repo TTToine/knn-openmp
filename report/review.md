@@ -301,8 +301,12 @@ hyperthread 300 KB > 256 KB). Il conto del brief, 2 × (TB + QB) × 3136 B =
 - **Validazione sull'intero test set** (10000 query × k ∈ {1, 5, 10} × 2 metriche ×
   6 varianti, 8 thread): *esito in fondo a questo paragrafo* —
   `results/raw/validation_full_20261116_002255.log`.
-  **Esito: ancora in corso al momento del commit** (lanciata alle 00:22, ~35 min);
-  questa riga verrà sostituita con il numero di mismatch per variante.
+  **Esito: 0 mismatch in tutte le 36 combinazioni** (6 varianti × 6 configurazioni),
+  e 0 mismatch anche per le due varianti aggiunte dopo la revisione
+  (`omp_blocked4_pn`, `omp_simd_stagger`: 12 combinazioni, in coda allo stesso log).
+  Il riordino delle somme non cambia nessuna delle 10000 predizioni, per nessun k e
+  nessuna metrica: `MAX_MISMATCH` non serve. I tempi di quel log sono stati
+  cancellati apposta: non è una misura.
 - **Race condition: nessuna trovata.** Per ogni regione parallela: `train`, `test`,
   `params`, `train_norm`, `test_norm`, `xt`/`xb` sono condivisi in sola lettura;
   `TopK top`, `acc[]`, `tops` sono dichiarati dentro la regione (privati); ogni
