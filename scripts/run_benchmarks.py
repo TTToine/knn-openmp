@@ -93,7 +93,8 @@ def run(binary, out_csv, variant, threads, schedule, args, extra, tag=None, env_
 
 def data_args(args):
     if args.synthetic:
-        return ["--synthetic", "--n-train", str(args.n_train), "--n-test", str(args.n_test)]
+        dim = ["--dim", str(args.dim)] if args.dim else []
+        return ["--synthetic", "--n-train", str(args.n_train), "--n-test", str(args.n_test)] + dim
     return ["--data", args.data, "--n-test", str(args.n_test)]
 
 
@@ -114,6 +115,16 @@ def main():
     p.add_argument("--schedule", default="static", help="schedule for non-schedule sweeps")
     p.add_argument("--runs", type=int, default=5)
     p.add_argument("--warmup", type=int, default=1)
+    p.add_argument("--thread-list", default="",
+                   help="comma-separated thread counts replacing 1,2,4,6,8,12 (threads, sizes) "
+                        "or 1 + --threads (cachefit), e.g. 6,7,8,9,10,11,12")
+    p.add_argument("--schedules", nargs="+", default=None,
+                   help="schedule sweep values, space-separated (e.g. static static,1 dynamic,2)")
+    p.add_argument("--n-trains", default="",
+                   help="sizes experiment on MNIST: comma-separated training sizes "
+                        "(<= 60000: first N rows; multiples of 60000: replicated). "
+                        "Default: replicate 1, 2, 4")
+    p.add_argument("--dim", type=int, default=0, help="synthetic only: dimensionality (default 784)")
     p.add_argument("--no-seq", action="store_true", help="skip the sequential baseline run")
     p.add_argument("--allow-battery", action="store_true", help="do not abort when on battery")
     args = p.parse_args()
@@ -134,22 +145,38 @@ def main():
     seq = (lambda extra=(), tag=None: None) if args.no_seq else \
         (lambda extra=(), tag=None: run(binary, out_csv, "seq", 1, "static", args, list(extra), tag))
 
+    threads = [int(t) for t in args.thread_list.split(",") if t] or THREADS
+    schedules = args.schedules or SCHEDULES
+
     if args.experiment == "threads":
         seq()
-        for i, t in enumerate(THREADS):
+        for i, t in enumerate(threads):
             for v in rotated(variants, i):
                 run(binary, out_csv, v, t, args.schedule, args, [])
     elif args.experiment == "schedule":
         seq()
-        for i, s in enumerate(SCHEDULES):
+        for i, s in enumerate(schedules):
             for v in rotated(variants, i):
                 run(binary, out_csv, v, args.threads, s, args, [])
     elif args.experiment == "sizes":
-        for r in REPLICATES:
-            seq(["--replicate", str(r)])
-            for i, t in enumerate(THREADS):
+        # Input-size sweep. Default: the training set replicated 1, 2, 4 times.
+        # With --n-trains: sub-sampled (first N rows) or replicated MNIST.
+        if args.n_trains:
+            sizes = []
+            for n in (int(x) for x in args.n_trains.split(",") if x):
+                if n <= 60000:
+                    sizes.append(["--n-train", str(n)])
+                elif n % 60000 == 0:
+                    sizes.append(["--replicate", str(n // 60000)])
+                else:
+                    sys.exit(f"--n-trains {n}: must be <= 60000 or a multiple of 60000")
+        else:
+            sizes = [["--replicate", str(r)] for r in REPLICATES]
+        for extra in sizes:
+            seq(extra)
+            for i, t in enumerate(threads):
                 for v in rotated(variants, i):
-                    run(binary, out_csv, v, t, args.schedule, args, ["--replicate", str(r)])
+                    run(binary, out_csv, v, t, args.schedule, args, extra)
     elif args.experiment == "kmetric":
         i = 0
         for m in METRICS:
@@ -172,7 +199,7 @@ def main():
         # 1 thread and the --threads value; training sizes from L2 to DRAM.
         i = 0
         for ntr, nte in CACHEFIT:
-            for t in sorted({1, args.threads}):
+            for t in (threads if args.thread_list else sorted({1, args.threads})):
                 for v in rotated(variants, i):
                     run(binary, out_csv, v, t, args.schedule, args,
                         ["--n-test", str(nte), "--n-train", str(ntr)], tag=f"{args.tag}cachefit")

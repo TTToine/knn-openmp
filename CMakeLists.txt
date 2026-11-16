@@ -49,6 +49,12 @@ endif()
 add_executable(knn src/main.cpp)
 target_link_libraries(knn PRIVATE knn_core)
 
+# Measurement helper (clock frequency under load, DRAM read bandwidth): the
+# numbers the performance model needs and WSL2 does not expose.
+add_executable(hwprobe tools/hwprobe.cpp)
+target_link_libraries(hwprobe PRIVATE OpenMP::OpenMP_CXX)
+target_compile_options(hwprobe PRIVATE -O2 -mavx2 -mfma -Wall -Wextra)
+
 # ---- tests --------------------------------------------------------------------
 enable_testing()
 add_test(NAME smoke

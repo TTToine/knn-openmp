@@ -3,6 +3,9 @@
 #include <omp.h>
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <thread>
 #include <cstdio>
 #include <cstdlib>
 #include <new>
@@ -23,12 +26,16 @@ void knn_omp_naive(const Dataset& train, const Dataset& test,
     if (params.metric == Metric::Cosine) {
         train_norm.resize(train.n);
         test_norm.resize(test.n);
-        row_norms(train, train_norm.data());   // TODO: parallelise too (small cost)
+        row_norms(train, train_norm.data());   // serial on purpose: see omp_blocked4_pn
         row_norms(test, test_norm.data());
     }
 
     const long n_test = static_cast<long>(test.n);
-#pragma omp parallel for schedule(runtime)
+    // default(none): every variable used in the region must be listed. All of
+    // them are shared and only READ, except out[] (each out[i] written by exactly
+    // one thread). `top`, `q`, `t`, `dist` are declared inside -> private.
+#pragma omp parallel for schedule(runtime) default(none) \
+    shared(train, test, params, out, train_norm, test_norm, d, n_test)
     for (long i = 0; i < n_test; ++i) {
         const float* q = test.row(i);
         TopK top(params.k);
@@ -79,7 +86,8 @@ void knn_omp_simd(const Dataset& train, const Dataset& test,
     }
 
     const long n_test = static_cast<long>(test.n);
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(runtime) default(none) \
+    shared(train, test, params, out, train_norm, test_norm, d, n_test)
     for (long i = 0; i < n_test; ++i) {
         const float* q = test.row(i);
         TopK top(params.k);
@@ -129,7 +137,8 @@ void knn_omp_blocked(const Dataset& train, const Dataset& test,
     }
 
     const long n_qblocks = static_cast<long>((test.n + QB - 1) / QB);
-#pragma omp parallel
+#pragma omp parallel default(none) \
+    shared(train, test, params, out, train_norm, test_norm, d, TB, QB, n_qblocks)
     {
         // One TopK per query of the block, private to the thread (declared
         // inside the parallel region). Allocated once per thread, not per block.
@@ -193,7 +202,7 @@ void knn_omp_soa(const Dataset& train, const Dataset& test,
     const long n_jblocks = static_cast<long>(n_pad / JB);
     // Blocked transpose: JB rows (200 KB) are read while they are in L2. Each
     // thread first-touches the pages it writes (parallel page faults).
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) default(none) shared(train, xt, d, n, n_pad, n_jblocks)
     for (long b = 0; b < n_jblocks; ++b) {
         const std::size_t j0 = static_cast<std::size_t>(b) * JB;
         for (std::size_t f = 0; f < d; ++f) {
@@ -202,8 +211,9 @@ void knn_omp_soa(const Dataset& train, const Dataset& test,
                 dst[jj] = (j0 + jj < n) ? train.x[(j0 + jj) * d + f] : 0.0f;   // padding = 0
         }
     }
+    knn_prep_seconds = omp_get_wtime() - t_start;   // layout conversion, reported apart in the CSV
     if (std::getenv("KNN_VERBOSE"))
-        std::fprintf(stderr, "omp_soa: transpose %.4f s\n", omp_get_wtime() - t_start);
+        std::fprintf(stderr, "omp_soa: transpose %.4f s\n", knn_prep_seconds);
 
     std::vector<float> train_norm, test_norm;
     if (params.metric == Metric::Cosine) {
@@ -215,7 +225,8 @@ void knn_omp_soa(const Dataset& train, const Dataset& test,
     const bool euclid = params.metric == Metric::Euclidean;
 
     const long n_test = static_cast<long>(test.n);
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(runtime) default(none) \
+    shared(train, test, params, out, train_norm, test_norm, xt, d, n, n_pad, euclid, n_test, JB)
     for (long i = 0; i < n_test; ++i) {
         const float* q = test.row(i);
         TopK top(params.k);
@@ -264,7 +275,7 @@ void knn_omp_aosoa(const Dataset& train, const Dataset& test,
     const double t_start = omp_get_wtime();
     AlignedBuffer xb(d * n_pad);   // xb.p[(b * d + f) * JB + jj] = feature f of sample b*JB+jj
     const long n_jblocks = static_cast<long>(n_pad / JB);
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) default(none) shared(train, xb, d, n, n_jblocks)
     for (long b = 0; b < n_jblocks; ++b) {
         const std::size_t j0 = static_cast<std::size_t>(b) * JB;
         float* blk = xb.p + static_cast<std::size_t>(b) * d * JB;
@@ -272,8 +283,9 @@ void knn_omp_aosoa(const Dataset& train, const Dataset& test,
             for (std::size_t jj = 0; jj < JB; ++jj)
                 blk[f * JB + jj] = (j0 + jj < n) ? train.x[(j0 + jj) * d + f] : 0.0f;
     }
+    knn_prep_seconds = omp_get_wtime() - t_start;   // layout conversion, reported apart in the CSV
     if (std::getenv("KNN_VERBOSE"))
-        std::fprintf(stderr, "omp_aosoa: transpose %.4f s\n", omp_get_wtime() - t_start);
+        std::fprintf(stderr, "omp_aosoa: transpose %.4f s\n", knn_prep_seconds);
 
     std::vector<float> train_norm, test_norm;
     if (params.metric == Metric::Cosine) {
@@ -285,7 +297,8 @@ void knn_omp_aosoa(const Dataset& train, const Dataset& test,
     const bool euclid = params.metric == Metric::Euclidean;
 
     const long n_test = static_cast<long>(test.n);
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(runtime) default(none) \
+    shared(train, test, params, out, train_norm, test_norm, xb, d, n, euclid, n_test, JB)
     for (long i = 0; i < n_test; ++i) {
         const float* q = test.row(i);
         TopK top(params.k);
@@ -349,8 +362,27 @@ static inline void dot_x4(const float* q0, const float* q1, const float* q2,
     out[0] = s0; out[1] = s1; out[2] = s2; out[3] = s3;
 }
 
-void knn_omp_blocked4(const Dataset& train, const Dataset& test,
-                      const KnnParams& params, std::uint8_t* out) {
+// Row norms with a parallel loop over the rows (used by omp_blocked4_pn only).
+// Each row is still summed by ONE thread in increasing feature order, like
+// row_norms() in knn_common.hpp: the only change is which thread does which row.
+// schedule(static): every row costs the same, no need for dynamic balancing.
+static void row_norms_parallel(const Dataset& ds, float* out) {
+    const long n = static_cast<long>(ds.n);
+#pragma omp parallel for schedule(static) default(none) shared(ds, out, n)
+    for (long i = 0; i < n; ++i) {
+        const float* r = ds.row(i);
+        float s = 0.0f;
+        for (std::size_t j = 0; j < ds.d; ++j) s += r[j] * r[j];
+        out[i] = std::sqrt(s);
+    }
+}
+
+// Body shared by omp_blocked4 and omp_blocked4_pn. `parallel_norms` is a
+// compile-time constant in both callers and the function is always inlined, so
+// omp_blocked4 compiles to the same code as before this helper existed.
+[[gnu::always_inline]] static inline void blocked4_impl(const Dataset& train, const Dataset& test,
+                                                        const KnnParams& params, std::uint8_t* out,
+                                                        const bool parallel_norms) {
     const std::size_t d = train.d;
     const std::size_t TB = env_size("KNN_TB", 32);   // same tiles as omp_blocked
     const std::size_t QB = env_size("KNN_QB", 16);
@@ -360,8 +392,13 @@ void knn_omp_blocked4(const Dataset& train, const Dataset& test,
     if (params.metric == Metric::Cosine) {
         train_norm.resize(train.n);
         test_norm.resize(test.n);
-        row_norms(train, train_norm.data());
-        row_norms(test, test_norm.data());
+        if (parallel_norms) {
+            row_norms_parallel(train, train_norm.data());
+            row_norms_parallel(test, test_norm.data());
+        } else {
+            row_norms(train, train_norm.data());
+            row_norms(test, test_norm.data());
+        }
     }
     const bool euclid = params.metric == Metric::Euclidean;
     auto to_dist = [&](float v, std::size_t i, std::size_t j) {
@@ -369,7 +406,8 @@ void knn_omp_blocked4(const Dataset& train, const Dataset& test,
     };
 
     const long n_qblocks = static_cast<long>((test.n + QB - 1) / QB);
-#pragma omp parallel
+#pragma omp parallel default(none) \
+    shared(train, test, params, out, d, TB, QB, n_qblocks, euclid, to_dist)
     {
         std::vector<TopK> tops(QB, TopK(params.k));
 
@@ -403,6 +441,68 @@ void knn_omp_blocked4(const Dataset& train, const Dataset& test,
                 }
             }
             for (std::size_t i = i0; i < i1; ++i) out[i] = tops[i - i0].vote();
+        }
+    }
+}
+
+void knn_omp_blocked4(const Dataset& train, const Dataset& test,
+                      const KnnParams& params, std::uint8_t* out) {
+    blocked4_impl(train, test, params, out, /*parallel_norms=*/false);
+}
+
+// v5b - omp_blocked4 with the row norms of the cosine metric computed in
+// parallel. One idea: remove the serial fraction (Amdahl). In every other
+// variant row_norms() runs on one thread INSIDE the timed call: ~47 M dependent
+// scalar adds for MNIST. It is invisible next to the 19 s of seq, but it is a
+// fixed cost that does not shrink with the threads, so it weighs more and more
+// as the parallel part gets faster. Identical to omp_blocked4 for euclidean.
+void knn_omp_blocked4_pn(const Dataset& train, const Dataset& test,
+                         const KnnParams& params, std::uint8_t* out) {
+    blocked4_impl(train, test, params, out, /*parallel_norms=*/true);
+}
+
+// DIAGNOSTIC variant (not an optimisation): omp_simd where thread t starts
+// t * KNN_STAGGER_MS milliseconds late (default 20 ms).
+// Why: with schedule(static) all threads scan the SAME training rows at almost
+// the same time, so one thread pulls a row from DRAM into the shared L3 and the
+// others find it there ("convoy"): the apparent bandwidth exceeds the DRAM peak.
+// A 20 ms head start is ~260 MB of training at 13 GB/s, far more than the 12 MB
+// of L3: the threads can no longer share rows. If the run time jumps to the
+// DRAM-bound value, the sharing is demonstrated by intervention, not inferred.
+// The predictions are identical to omp_simd (same kernel, same order).
+// NB: the delays are inside the timed call: (threads-1) * KNN_STAGGER_MS of the
+// measured time is just waiting. Always static: with dynamic the late threads
+// would simply get less work.
+void knn_omp_simd_stagger(const Dataset& train, const Dataset& test,
+                          const KnnParams& params, std::uint8_t* out) {
+    const std::size_t d = train.d;
+    const long stagger_ms = static_cast<long>(env_size("KNN_STAGGER_MS", 20));
+
+    std::vector<float> train_norm, test_norm;
+    if (params.metric == Metric::Cosine) {
+        train_norm.resize(train.n);
+        test_norm.resize(test.n);
+        row_norms(train, train_norm.data());
+        row_norms(test, test_norm.data());
+    }
+
+    const long n_test = static_cast<long>(test.n);
+#pragma omp parallel default(none) \
+    shared(train, test, params, out, train_norm, test_norm, d, n_test, stagger_ms)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(stagger_ms * omp_get_thread_num()));
+#pragma omp for schedule(static)
+        for (long i = 0; i < n_test; ++i) {
+            const float* q = test.row(i);
+            TopK top(params.k);
+            for (std::size_t j = 0; j < train.n; ++j) {
+                const float* t = train.row(j);
+                const float dist = (params.metric == Metric::Euclidean)
+                                       ? sq_euclidean_simd(q, t, d)
+                                       : cosine_distance(dot_simd(q, t, d), test_norm[i], train_norm[j]);
+                top.push(dist, train.y[j]);
+            }
+            out[i] = top.vote();
         }
     }
 }

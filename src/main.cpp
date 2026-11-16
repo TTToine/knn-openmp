@@ -209,16 +209,18 @@ int main(int argc, char** argv) {
 
     // ---- runs (only the knn call is timed) ----
     std::vector<std::uint8_t> pred(test.n);
-    std::vector<double> times, cpu_times;
+    std::vector<double> times, cpu_times, prep_times;
     for (int r = 0; r < o.warmup + o.runs; ++r) {
+        knn_prep_seconds = 0.0;   // set by variants that convert the data layout (see knn.hpp)
         const double c0 = process_cpu_seconds();
         const double t0 = omp_get_wtime();
         var->fn(train, test, o.params, pred.data());
         const double t1 = omp_get_wtime();
         const double c1 = process_cpu_seconds();
         if (r >= o.warmup) {
-            times.push_back(t1 - t0);
+            times.push_back(t1 - t0);        // time_s still INCLUDES the preparation
             cpu_times.push_back(c1 - c0);
+            prep_times.push_back(knn_prep_seconds);
         }
     }
 
@@ -266,15 +268,16 @@ int main(int argc, char** argv) {
         const bool new_file = !fs::exists(o.csv);
         if (fs::path(o.csv).has_parent_path()) fs::create_directories(fs::path(o.csv).parent_path());
         std::ofstream f(o.csv, std::ios::app);
-        // cpu_s is the last column so that older CSVs (without it) still line up.
+        // New columns go last so that older CSVs (without them) still line up.
+        // prep_s = part of time_s spent converting the data layout (0 if none).
         if (new_file)
-            f << "tag,variant,threads,schedule,k,metric,source,n_train,n_test,dim,replicate,run,time_s,accuracy,mismatches,cpu_s\n";
+            f << "tag,variant,threads,schedule,k,metric,source,n_train,n_test,dim,replicate,run,time_s,accuracy,mismatches,cpu_s,prep_s\n";
         for (std::size_t r = 0; r < times.size(); ++r)
             f << o.tag << ',' << var->name << ',' << threads << ',' << sched << ','
               << o.params.k << ',' << metric_name(o.params.metric) << ','
               << (o.synthetic ? "synthetic" : "mnist") << ',' << train.n << ',' << test.n << ','
               << train.d << ',' << o.replicate << ',' << r << ',' << times[r] << ',' << acc << ','
-              << mismatches << ',' << cpu_times[r] << '\n';
+              << mismatches << ',' << cpu_times[r] << ',' << prep_times[r] << '\n';
     }
     return valid ? 0 : 2;
 }

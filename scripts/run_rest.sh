@@ -8,7 +8,11 @@ cd "$(dirname "$0")/.."
 B="python3 scripts/run_benchmarks.py"
 echo "### commit $(git rev-parse --short HEAD) $(git diff --quiet || echo '(dirty)')"
 cat /sys/class/power_supply/*/online 2>/dev/null | tr '\n' ' '; echo "(AC online)"
-$B tiles    --variants omp_blocked,omp_blocked4 --threads 6
+# drift check BEFORE spending 30 minutes (~2.5 min): seq must be 19.1 s +- 3% and
+# omp_blocked4 at 12 threads 0.171 s +- 5% (threads_20261115_184752). If not, stop
+# (Ctrl-C) and fix the conditions: power plan, charger, background applications.
+$B threads  --variants omp_blocked4 --thread-list 12
+$B tiles   --variants omp_blocked,omp_blocked4 --threads 6
 $B tiles    --variants omp_blocked,omp_blocked4 --threads 12
 $B cachefit --variants omp_naive,omp_simd,omp_soa,omp_aosoa --threads 6
 $B vec      --variants omp_naive,omp_simd

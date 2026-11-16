@@ -54,6 +54,23 @@ void knn_omp_aosoa(const Dataset& train, const Dataset& test,
 void knn_omp_blocked4(const Dataset& train, const Dataset& test,
                       const KnnParams& params, std::uint8_t* out);
 
+// omp_blocked4 with the cosine row norms computed in parallel (Amdahl example).
+void knn_omp_blocked4_pn(const Dataset& train, const Dataset& test,
+                         const KnnParams& params, std::uint8_t* out);
+
+// DIAGNOSTIC: omp_simd where thread t starts t * KNN_STAGGER_MS ms late, to
+// break the sharing of training rows in L3 between synchronous threads.
+void knn_omp_simd_stagger(const Dataset& train, const Dataset& test,
+                          const KnnParams& params, std::uint8_t* out);
+
+// Seconds spent by the LAST call in one-off data preparation that is part of
+// the timed call but not of the k-NN kernel (layout conversion of omp_soa /
+// omp_aosoa: allocation + transposition). 0 for the other variants. The driver
+// resets it before every call and writes it in the `prep_s` CSV column, so the
+// report can show kernel and conversion separately. Written by the calling
+// thread only, outside any parallel region.
+inline double knn_prep_seconds = 0.0;
+
 // ---- Variant registry (see src/variants.cpp) ----
 struct Variant {
     std::string name;
